@@ -1,0 +1,43 @@
+# LLVM DCPU-16 maintenance
+
+Read `PROJECT_MEMORY.md` and `docs/MODERNIZATION.md` before changing this project.
+Update project memory with decisions, exact build/test results, and remaining work
+at meaningful milestones so another session can continue without guessing.
+
+## Objective
+
+Adopt FrOSt-Foundation/llvm-dcpu16's `new-dcpu16` branch as a maintained,
+community-useful modern LLVM toolchain. Nyet is a downstream consumer, not the
+toolchain's only supported frontend. Preserve original authorship and licenses.
+
+## Development rules
+
+- Work on `modernize/llvm23`; preserve the historical `new-dcpu16` baseline.
+- Pin upstream LLVM source versions and keep backend and LLVM-core patches
+  separately reviewable. Prefer upstream interfaces to broad core changes.
+- The current baseline is LLVM 23.1.4. LLVM 22.1.8 is available locally for
+  compatibility checks. Never describe an unbuilt version as validated.
+- A byte-size option is an ABI choice, not just an instruction-selection flag.
+  Specify pointer arithmetic, object layout, memory intrinsic units, serialization,
+  and cross-module compatibility before declaring a mode supported.
+- Keep semantic integer widths unchanged: i8 is eight bits, i16 is sixteen bits.
+- Do not silently accept unsupported IR, CPU features, or ABI combinations.
+- Use LLVM regression tests and emulator-based execution tests. Compile success
+  alone does not demonstrate correct code generation. Test optimized code too.
+- Keep generated files, downloaded LLVM sources, and build outputs out of Git.
+- Do not modify the sibling Nyet checkout as part of toolchain maintenance.
+- User authorization covers modernization, local builds, tests, and project docs.
+  Do not publish releases or contact prior maintainers without explicit direction.
+
+## Layout
+
+The root retains LLVM 4-era sources for historical reference; its CMake entry
+point now builds `modern/`. Do not restore the old LLVM 4 build accidentally.
+`modern/` contains the standalone backend, driver, reference assembler/CPU,
+execution tests, and pinned build script. Its current ABI is octet16, described
+in `docs/ABI.md`; `--byte-size=16` is deliberately rejected pending a core port.
+
+Build with `python3 modern/scripts/build.py --bootstrap` or provide `--llvm-dir`.
+CTest runs binary execution at O0/O2. `--clang /path/to/clang` enables the optional
+MSP430-layout C frontend bridge test. Use the build script, not historical justfiles
+or LLVM 4-era root build instructions.

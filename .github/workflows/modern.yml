@@ -1,0 +1,34 @@
+name: Modern DCPU16
+on:
+  push:
+    paths: ["modern/**", "CMakeLists.txt", ".github/workflows/modern.yml"]
+  pull_request:
+    paths: ["modern/**", "CMakeLists.txt", ".github/workflows/modern.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Linux build prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
+      - name: macOS build prerequisites
+        if: runner.os == 'macOS'
+        run: brew list ninja >/dev/null || brew install ninja
+      - uses: actions/cache@v4
+        with:
+          path: build-modern
+          key: dcpu16-llvm23-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modern/llvm-source.json', 'modern/scripts/build.py') }}
+      - name: Build verified LLVM and DCPU16; run O0/O2 execution tests
+        run: python3 modern/scripts/build.py --bootstrap --jobs 4
