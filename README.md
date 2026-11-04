@@ -15,7 +15,9 @@ Read [the ABI](docs/ABI.md) and [the remaining modernization work](docs/MODERNIZ
 
 Requirements: Python 3.10+, a C++17 compiler, CMake 3.20+, Ninja, and an LLVM
 22/23 development kit including `llvm-tblgen` and the shared LLVM library.
-The compiler itself has no Python package dependencies.
+The compiler itself has no Python package dependencies. Installed compilers
+retain the library search path to the matching LLVM development kit; they do not
+bundle that kit.
 
 Build the pinned LLVM release from its verified source archive, then the backend:
 
@@ -60,13 +62,34 @@ python3 modern/tools/dcpu16.py assemble program.s -o program.bin --endian big
 ```
 
 The reference tools also include a binary test CPU without peripherals. They are
-deliberately small; unsupported directives/instructions fail explicitly. Native
-LLVM MC object emission and a general-purpose linker are still pending.
+deliberately small; unsupported directives/instructions fail explicitly. The
+static linker uses versioned DCPU JSON objects. Native LLVM MC object emission
+remains pending.
 
 An executable example is in `modern/examples/`: compile `add.ll`, concatenate
 `start.s` before the generated assembly, and assemble the result. Running that
 image with `python3 modern/tools/dcpu16.py run program.bin --stop 8` prints
 registers with `A` equal to 42.
+
+## Separate compilation and linking
+
+Compile and assemble each module independently, then link the objects in image
+order. Place startup code first because the image loads at hardware word zero:
+
+```sh
+build-modern/dcpu16-build/modern/dcpu16-llc modern/examples/add.ll -O2 -o add.s
+python3 modern/tools/dcpu16.py assemble -c modern/examples/start.s -o start.dco
+python3 modern/tools/dcpu16.py assemble -c add.s -o add.dco
+python3 modern/tools/dcpu16.py link start.dco add.dco -o program.bin --map program.map.json
+python3 modern/tools/dcpu16.py run program.bin --stop 8
+```
+
+The linker resolves local and exported symbols, aligns modules, applies address
+relocations, and checks the final ABI/address-space limits. `--endian big|little`
+chooses binary word serialization. The optional map reports hardware-word
+addresses. Compiler output carries an ABI declaration; contradictory assembler
+flags and mixed-ABI objects are rejected. See [the object format](docs/OBJECT_FORMAT.md)
+for supported relocations and limitations.
 
 ## C frontend bridge
 

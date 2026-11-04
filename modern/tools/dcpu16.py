@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference binary assembler and DCPU-16 v1.7 test machine (no host syscalls).
+"""Reference assembler, static linker, and DCPU-16 test machine (no host syscalls).
 
 The CPU executes encoded 16-bit words, independently of LLVM machine nodes.
 Unsupported directives/opcodes fail rather than being treated as no-ops.
@@ -14,12 +14,16 @@ BASIC.update(ADX=0x1A, SBX=0x1B, STI=0x1E, STD=0x1F)
 SPECIAL = {"JSR": 1}
 
 
-def expression(text, labels, unresolved=False):
+def expression(text, labels, unresolved=False, truncate=True):
     text = text.strip()
-    for name in sorted(labels, key=len, reverse=True):
-        text = re.sub(r"(?<![\w.])" + re.escape(name) + r"(?![\w.])", str(labels[name]), text)
-    if unresolved and re.search(r"(?<![\w.])[A-Za-z_.][\w.]*", text):
-        return 0
+    def resolve(match):
+        name = match.group()
+        if name in labels:
+            return str(labels[name])
+        if unresolved:
+            return "0"
+        raise ValueError(f"undefined symbol: {name}")
+    text = re.sub(r"(?<![\w.$])[A-Za-z_.$][\w.$]*", resolve, text, flags=re.ASCII)
     node = ast.parse(text, mode="eval").body
 
     def value(n):
@@ -31,13 +35,15 @@ def expression(text, labels, unresolved=False):
             left, right = value(n.left), value(n.right)
             if isinstance(n.op, ast.Add): return left + right
             if isinstance(n.op, ast.Sub): return left - right
-            if isinstance(n.op, ast.LShift) and 0 <= right <= 16: return left << right
-            if isinstance(n.op, ast.RShift) and 0 <= right <= 16: return left >> right
+            if isinstance(n.op, ast.LShift) and 0 <= right <= 63: return left << right
+            if isinstance(n.op, ast.RShift) and 0 <= right <= 63: return left >> right
+            if isinstance(n.op, ast.BitAnd): return left & right
         raise ValueError(f"unsupported assembly expression: {text}")
-    return value(node) & 0xFFFF
+    result = value(node)
+    return result & 0xFFFF if truncate else result
 
 
-def operand(text, labels, is_a, unresolved=False):
+def operand(text, is_a):
     text = text.strip()
     upper = text.upper()
     if upper in REGS:
@@ -49,7 +55,7 @@ def operand(text, labels, is_a, unresolved=False):
     if upper in ("PEEK", "[SP]"):
         return 0x19, []
     if upper.startswith("PICK "):
-        return 0x1A, [expression(text[5:], labels, unresolved)]
+        return 0x1A, [text[5:]]
     if upper in ("SP", "PC", "EX"):
         return {"SP": 0x1B, "PC": 0x1C, "EX": 0x1D}[upper], []
     if text.startswith("[") and text.endswith("]"):
@@ -57,90 +63,19 @@ def operand(text, labels, is_a, unresolved=False):
         if inner.upper() in REGS:
             return 8 + REGS[inner.upper()], []
         for reg, number in REGS.items():
-            found = re.search(r"(?<![\w.])" + reg + r"(?![\w.])", inner, re.I)
+            found = re.search(r"(?<![\w.$])" + reg + r"(?![\w.$])", inner, re.I)
             if found:
                 offset = inner[:found.start()] + "0" + inner[found.end():]
-                return 0x10 + number, [expression(offset, labels, unresolved)]
-        return 0x1E, [expression(inner, labels, unresolved)]
-    return 0x1F, [expression(text, labels, unresolved)]
+                return 0x10 + number, [offset]
+        return 0x1E, [inner]
+    return 0x1F, [text]
 
 
 def assemble(source):
-    lines = [line.split(";", 1)[0].strip() for line in source.splitlines()]
-    labels = {}
-
-    def emit(unresolved):
-        words = []
-        pending_byte = False
-
-        def emit_byte(value):
-            nonlocal pending_byte
-            if pending_byte:
-                words[-1] |= (value & 255) << 8
-            else:
-                words.append(value & 255)
-            pending_byte = not pending_byte
-
-        for line in lines:
-            if not line:
-                continue
-            if line.endswith(":"):
-                if pending_byte:
-                    raise ValueError("label must be word aligned")
-                if unresolved:
-                    if line[:-1] in labels:
-                        raise ValueError(f"duplicate label: {line}")
-                    labels[line[:-1]] = len(words)
-                continue
-            parts = line.split(None, 1)
-            op = parts[0]
-            args = parts[1] if len(parts) > 1 else ""
-            if op in (".text", ".data", ".bss", ".file", ".globl", ".type", ".size", ".section", ".ident", ".addrsig"):
-                continue
-            if op == ".p2align":
-                pending_byte = False
-                align = max(1, (1 << int(args.split(",")[0])) // 2)
-                words.extend([0] * (-len(words) % align))
-                continue
-            if op == ".byte":
-                for item in args.split(","):
-                    emit_byte(expression(item, labels, unresolved))
-                continue
-            if op in (".ascii", ".asciz"):
-                value = ast.literal_eval(args).encode("latin-1")
-                for byte in value + (b"\0" if op == ".asciz" else b""):
-                    emit_byte(byte)
-                continue
-            if op in (".short", ".word"):
-                if pending_byte:
-                    raise ValueError("unaligned word data")
-                words.extend(expression(x, labels, unresolved) for x in args.split(","))
-                continue
-            if op == ".zero":
-                size = int(args)
-                for _ in range(size):
-                    emit_byte(0)
-                continue
-            if pending_byte:
-                raise ValueError("unaligned instruction")
-            op = op.upper()
-            if op in BASIC:
-                b, a = args.split(",", 1)
-                ac, aw = operand(a, labels, True, unresolved)
-                bc, bw = operand(b, labels, False, unresolved)
-                if bc == 0x1F:
-                    raise ValueError("literal destination")
-                words.extend([BASIC[op] | bc << 5 | ac << 10, *aw, *bw])
-            elif op in SPECIAL:
-                ac, aw = operand(args, labels, True, unresolved)
-                words.extend([SPECIAL[op] << 5 | ac << 10, *aw])
-            else:
-                raise ValueError(f"unsupported assembly: {line}")
-        if len(words) > 65536:
-            raise ValueError("image exceeds DCPU memory")
-        return words
-    emit(True)
-    return emit(False), labels
+    from dcpu16_object import assemble_object, declared_abi, link_objects
+    obj = assemble_object(source, abi=declared_abi(source) or "raw")
+    words, _ = link_objects([obj])
+    return words, {name: record["offset"] for name, record in obj["symbols"].items()}
 
 
 def signed(n):
@@ -292,7 +227,13 @@ def main():
     asm.add_argument("-o", "--output", type=Path, required=True)
     asm.add_argument("--endian", choices=("big", "little"), default="big",
                      help="binary word serialization; memory octets remain little endian")
-    asm.add_argument("--abi", choices=("raw", "octet16"), default="octet16")
+    asm.add_argument("--abi", choices=("raw", "octet16"), help="require this ABI (defaults to declared ABI or octet16)")
+    asm.add_argument("-c", "--relocatable", action="store_true", help="emit a versioned JSON object with relocations")
+    link = commands.add_parser("link", help="link relocatable objects into a flat binary")
+    link.add_argument("inputs", nargs="+", type=Path)
+    link.add_argument("-o", "--output", required=True, type=Path)
+    link.add_argument("--map", dest="map_file", type=Path, help="write final hardware-word symbol addresses")
+    link.add_argument("--endian", choices=("big", "little"), default="big")
     run = commands.add_parser("run", help="execute a binary without peripherals")
     run.add_argument("input", type=Path)
     run.add_argument("--endian", choices=("big", "little"), default="big")
@@ -300,13 +241,27 @@ def main():
     run.add_argument("--entry", type=lambda x: int(x, 0), default=0)
     run.add_argument("--limit", type=int, default=100000)
     args = parser.parse_args()
+    from dcpu16_object import assemble_object, link_objects
     try:
         order = ">" if args.endian == "big" else "<"
         if args.command == "assemble":
-            words, _ = assemble(args.input.read_text())
-            if args.abi == "octet16" and len(words) > 32768:
-                raise ValueError("octet16 images must fit in the lower 32768 hardware words")
+            obj = assemble_object(args.input.read_text(), abi=args.abi)
+            if args.relocatable:
+                args.output.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\n")
+            else:
+                words, _ = link_objects([obj], [str(args.input)])
+                args.output.write_bytes(struct.pack(order + "H" * len(words), *words))
+        elif args.command == "link":
+            objects = []
+            for path in args.inputs:
+                try:
+                    objects.append(json.loads(path.read_text()))
+                except ValueError as error:
+                    raise ValueError(f"{path}: {error}") from error
+            words, link_map = link_objects(objects, [str(path) for path in args.inputs])
             args.output.write_bytes(struct.pack(order + "H" * len(words), *words))
+            if args.map_file:
+                args.map_file.write_text(json.dumps(link_map, indent=2, sort_keys=True) + "\n")
         else:
             data = args.input.read_bytes()
             if len(data) % 2 or len(data) > 131072:

@@ -215,6 +215,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   legacy::PassManager Passes;
+  Out.os() << ".ident \"dcpu16-abi:octet16\"\n";
   if (TM->addPassesToEmitFile(Passes, Out.os(), nullptr,
                               CodeGenFileType::AssemblyFile)) {
     errs() << "DCPU16 assembly emission unavailable\n";

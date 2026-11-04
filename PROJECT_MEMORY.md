@@ -46,7 +46,8 @@ root `include/`, `lib/`, etc. are retained for historical reference only.
 - Upstream LLVM 23 libraries/source are at `/private/tmp/llvm23-dcpu-build` and
   `/private/tmp/llvm-project-23.1.4.src`. Temporary paths may disappear; rebuild
   with the checked-in bootstrap script rather than relying on them permanently.
-- CTest runs 20 unittest methods (plus parameterized execution cases) at each
+- The initial port had 20 unittest methods; current coverage has 32 methods
+  (plus parameterized execution cases, including installed-tool tests) at each
   of O0/O2. The optional C bridge test uses Homebrew Clang 22.1.8 with MSP430
   frontend layout; it produces LLVM IR only, never MSP430 machine code.
 - Tests cover arithmetic, comparisons, boolean results, shifts, recursion,
@@ -78,7 +79,7 @@ MachineFunctionInfo allocation, symbol materialization and pointer serialization
 ## Remaining work
 
 Full adoption is still in progress. Native 16-bit-byte core support, native LLVM
-MC object encoding/linking, native Clang target support, a hosted runtime and
+MC object encoding/linker integration, native Clang target support, a hosted runtime and
 wide arithmetic helpers, peripheral/interrupt SDK, broader conformance testing,
 and Nyet integration are not finished. Some unsupported IR is diagnosed early;
 other unsupported legalizer/runtime cases may still fail in LLVM.
@@ -96,3 +97,35 @@ The implementation and documentation are pushed on modernize/llvm23. The fork's
 historical default new-dcpu16 branch is preserved. No release has been published.
 Do not publish a release until its actual artifacts and support matrix have been
 verified. Further byte-model/SDK work remains as listed above.
+
+## Separate compilation and linker continuation (2026-11-04)
+
+Added relocatable DCPU JSON objects (`assemble -c`) and a static image linker
+(`link`) to the reference tools. Native LLVM MC/ELF object emission remains open.
+Read docs/OBJECT_FORMAT.md before changing the versioned schema or relocations.
+
+- Module-local symbols remain scoped; `.globl` exports resolve across modules.
+- Deferred expressions are resolved after final alignment and placement, including
+  `symbol << 1` octet-pointer initializers and 8/16/32/64-bit data fields.
+- Objects carry target and ABI metadata. Compiler assembly emits
+  `.ident "dcpu16-abi:octet16"`; contradictory assembler flags and mixed-ABI
+  objects are rejected. Raw assembly mode is not the legacy B16 compiler ABI.
+- Undefined references, duplicate exports, range/image overflow, malformed
+  records, and overlapping relocations produce errors before binary output.
+- Link maps expose hardware-word addresses. No hidden entry/startup is inserted;
+  the startup object must appear first.
+- Installation now retains LLVM's shared-library search path and installs the
+  object/linker module beside the Python tool. An installed-tool smoke test
+  compiles, assembles separate objects, links, and executes the sample with A=42.
+- New local LLVM 23 build: /private/tmp/dcpu-linker-build23/dcpu16-build.
+- New local LLVM 22 build: /private/tmp/dcpu-linker-build22/dcpu16-build.
+- Current staging source: /private/tmp/dcpu-linker-work; canonical source remains
+  /Users/novapy/Dev/llvm-dcpu16 on modernize/llvm23.
+- Local O0/O2 execution, relocation/diagnostic tests, cross-module compiled calls,
+  shared globals, stored function pointers, both binary word orders, and installed
+  toolchain execution pass. The optional Clang bridge is enabled locally.
+
+The initial-port CI run above remains the last recorded remote validation until
+this continuation is pushed and its workflow checked. No release is authorized.
+Remaining SDK work includes native non-octet bytes, native LLVM object emission,
+wide runtime helpers, device/interrupt support, native Clang, and Nyet integration.

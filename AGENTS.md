@@ -41,3 +41,9 @@ Build with `python3 modern/scripts/build.py --bootstrap` or provide `--llvm-dir`
 CTest runs binary execution at O0/O2. `--clang /path/to/clang` enables the optional
 MSP430-layout C frontend bridge test. Use the build script, not historical justfiles
 or LLVM 4-era root build instructions.
+
+`modern/tools/dcpu16.py assemble -c` emits versioned relocatable objects; `link`
+combines them into a flat image. Read `docs/OBJECT_FORMAT.md` before changing the
+format. Keep local symbols scoped to each input object, defer symbol expressions
+until final placement, and reject incompatible ABI declarations and overflowing
+relocations. Install `dcpu16_object.py` beside `dcpu16.py` when packaging tools.

@@ -55,6 +55,13 @@ memmove, and memset intrinsics are lowered to loops rather than host libc calls.
 Binary word serialization (`--endian big` or `--endian little` in the reference
 assembler) is distinct from the low-octet-first memory representation.
 
+Compiler assembly includes `.ident "dcpu16-abi:octet16"`. The assembler carries
+this declaration into relocatable objects and rejects a contradictory `--abi`.
+The static linker requires matching object ABIs and checks the complete image
+against the selected address space. Symbol addresses in objects/maps count
+hardware words; expressions such as `symbol << 1` produce octet pointers after
+final placement. See `OBJECT_FORMAT.md` for the format and linker contract.
+
 ## Byte-size options and future ABIs
 
 `--byte-size=8` explicitly selects the implemented mode. Other values produce
@@ -70,8 +77,12 @@ already-generated host IR or mix the historical ABI with octet16 silently.
 
 ## Current limits
 
-Native object encoding/linking, a native Clang target, a hosted runtime, soft
+Native LLVM MC object encoding, a native Clang target, a hosted runtime, soft
 float, vector operations, atomics, dynamic alloca, exceptions, varargs and
 interrupt/peripheral SDK support are not complete. Some unsupported IR is
 diagnosed up front; additional unsupported legalizer/libcall cases may still
 produce LLVM errors. Consult execution tests for measured coverage.
+
+Reference DCPU JSON object encoding and static image linking are implemented.
+ELF objects, archives, weak/common symbols, dynamic linking, and garbage
+collection of sections are not supported by that linker.

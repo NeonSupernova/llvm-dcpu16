@@ -68,3 +68,22 @@ need independent validation. Existing LLVM IR is not layout-neutral.
 Native 16-bit bytes, native MC object encoding/linking, a native Clang target,
 peripheral/interrupt SDK, complete runtime helpers, and Nyet integration remain
 open. The modernization is an adoption in progress, not a completed full SDK.
+
+## Separate compilation progress (2026-11-04)
+
+The reference assembler now emits relocatable JSON objects and the static linker
+combines independently compiled modules. It handles scoped local names, exports,
+word alignment, deferred address/data expressions, final symbol maps, ABI checks,
+and overflow/undefined/duplicate diagnostics. Compiler assembly declares octet16
+using a standard `.ident` record. The schema and limitations are in OBJECT_FORMAT.md.
+
+Cross-module direct calls, external globals, and stored function pointers execute
+correctly after relocation at O0/O2. The test suites now contain 32 methods per
+optimization level, including installation and binary CLI checks. Installation
+also preserves the LLVM shared-library search path; installed tools compile and
+link the sample to a binary that returns A=42.
+
+This completes reference object/static-link integration for the current ABI.
+Native LLVM MC/ELF object generation remains a separate task. Common/weak symbols,
+archives and section garbage collection are not implemented by the reference
+linker. The full SDK and non-octet-core milestones remain open.

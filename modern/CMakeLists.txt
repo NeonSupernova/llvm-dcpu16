@@ -48,6 +48,7 @@ if(LLVM_ENABLE_ASSERTIONS)
 endif()
 add_executable(dcpu16-llc tools/dcpu16-llc.cpp)
 target_link_libraries(dcpu16-llc PRIVATE DCPU16CodeGen LLVM)
+set_target_properties(dcpu16-llc PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 enable_testing()
 find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 set(DCPU16_CLANG_EXECUTABLE "" CACHE FILEPATH "Optional Clang with MSP430 support for C frontend tests")
@@ -55,7 +56,9 @@ foreach(level IN ITEMS 0 2)
   add_test(NAME dcpu16-execution-O${level}
     COMMAND "${CMAKE_COMMAND}" -E env
       "DCPU16_LLC=$<TARGET_FILE:dcpu16-llc>" "DCPU16_OPT_LEVEL=${level}" "DCPU16_CLANG=${DCPU16_CLANG_EXECUTABLE}"
+      "DCPU16_BUILD_DIR=${CMAKE_BINARY_DIR}"
       "${Python3_EXECUTABLE}" -m unittest discover -s "${CMAKE_CURRENT_SOURCE_DIR}/tests" -v)
 endforeach()
 install(TARGETS dcpu16-llc RUNTIME DESTINATION bin)
 install(PROGRAMS tools/dcpu16.py DESTINATION share/llvm-dcpu16)
+install(FILES tools/dcpu16_object.py DESTINATION share/llvm-dcpu16)
