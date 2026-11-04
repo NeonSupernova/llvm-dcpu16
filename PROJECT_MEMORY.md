@@ -14,7 +14,8 @@ to the wider community. Nyet prompted this effort but must remain a consumer.
 - Local checkout: /Users/novapy/Dev/llvm-dcpu16
 - Historical default: new-dcpu16, bdd3c695c99ced1cf98a61422f296025afd3fccd
 - Development branch: modernize/llvm23
-- Writable development worktree: /private/tmp/llvm-dcpu16-modern
+- Build worktree: /private/tmp/llvm-dcpu16-modern (now detached at the verified
+  implementation commit; the main checkout owns modernize/llvm23)
 - Sibling Nyet has preexisting user changes; leave them alone.
 
 ## Findings
@@ -82,6 +83,16 @@ wide arithmetic helpers, peripheral/interrupt SDK, broader conformance testing,
 and Nyet integration are not finished. Some unsupported IR is diagnosed early;
 other unsupported legalizer/runtime cases may still fail in LLVM.
 
-The GitHub Actions workflow is authored but has not yet been run. Do not claim
-Linux/CI validation based on local macOS tests. Do not publish a release until
-its actual artifacts and support matrix have been verified.
+## CI verification
+
+Implementation commit c8a89120888d3bc039da4444933afe8e5b6e6eb6 passed the actual
+GitHub Actions source-bootstrap/build/execution workflow on ubuntu-24.04 and
+macos-14:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/41747559232
+Both jobs completed successfully. CI runs the O0/O2 suites; the optional Clang
+bridge test is exercised locally with an explicitly supplied Clang path.
+
+The implementation and documentation are pushed on modernize/llvm23. The fork's
+historical default new-dcpu16 branch is preserved. No release has been published.
+Do not publish a release until its actual artifacts and support matrix have been
+verified. Further byte-model/SDK work remains as listed above.

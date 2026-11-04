@@ -59,8 +59,11 @@ need independent validation. Existing LLVM IR is not layout-neutral.
   obsolete shift lowering, and byte/word stack and pointer-unit mismatches.
 - Default memory model is upstream-compatible octet16. Non-octet requests and
   incompatible input layouts are rejected. This is **not** the old B16 core port.
-- CI and a checksum-pinned bootstrap script are provided. CI results are pending
-  an actual workflow run; local macOS tests do not establish Linux validation.
+- The checksum-pinned source bootstrap and O0/O2 execution suites passed actual
+  GitHub Actions jobs on ubuntu-24.04 and macos-14 for implementation commit
+  c8a89120888d3bc039da4444933afe8e5b6e6eb6:
+  https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/41747559232
+  The optional C bridge also passes locally with Clang explicitly supplied.
 
 Native 16-bit bytes, native MC object encoding/linking, a native Clang target,
 peripheral/interrupt SDK, complete runtime helpers, and Nyet integration remain
