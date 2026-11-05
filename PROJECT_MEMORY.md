@@ -174,6 +174,10 @@ with LLVM 23 on this host; no archive/section stripping yet.
 A diagnostic -verify-machineinstrs probe also identified a preexisting tied-use
 frame-index representation in ADD16ri before frame elimination. Normal builds
 and executions pass; strict machine-verifier cleanup remains separate work.
-Remote implementation CI verification is pending. No release was published.
+Implementation commit b8acc95ce21f6c4a79935e2a33bcb882bc35f84c passed actual
+source-bootstrap/build/O0/O2/installation CI on ubuntu-24.04 and macos-14:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/41986967332
+Both jobs completed successfully. The optional Clang bridge is validated locally;
+remote CI skips that optional method. No release was published.
 Native non-octet bytes, native LLVM objects, native Clang, full compiler-rt/libc,
 peripherals/interrupts, and Nyet integration remain open.

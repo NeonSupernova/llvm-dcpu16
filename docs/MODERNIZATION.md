@@ -112,4 +112,7 @@ runtime compilation, full-result arithmetic comparison, built runtime execution,
 and installed runtime linking. Local LLVM 23.1.4 and LLVM 22.1.8 suites pass at
 O0/O2 with the optional C frontend bridge enabled. See RUNTIME.md for scope and
 helper edge behavior. Complete compiler-rt, native bytes, Clang and device SDK
-work remain open. Remote verification for this implementation is pending.
+work remain open. Implementation commit
+b8acc95ce21f6c4a79935e2a33bcb882bc35f84c passed Ubuntu and macOS source-bootstrap,
+O0/O2 execution and installation CI:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/41986967332
