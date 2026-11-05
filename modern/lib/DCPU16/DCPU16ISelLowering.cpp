@@ -202,11 +202,11 @@ static void ParseFunctionArgs(const SmallVectorImpl<ArgT> &Args,
                               SmallVectorImpl<unsigned> &Out) {
   unsigned CurrentArgIndex = ~0U;
   for (unsigned i = 0, e = Args.size(); i != e; i++) {
-    if (CurrentArgIndex == Args[i].OrigArgIndex) {
+    if (!Out.empty() && CurrentArgIndex == Args[i].OrigArgIndex) {
       Out.back()++;
     } else {
       Out.push_back(1);
-      CurrentArgIndex++;
+      CurrentArgIndex = Args[i].OrigArgIndex;
     }
   }
 }
@@ -458,6 +458,15 @@ SDValue DCPU16TargetLowering::LowerCCCArguments(
   }
 
   return Chain;
+}
+
+bool DCPU16TargetLowering::CanLowerReturn(
+    CallingConv::ID CallConv, MachineFunction &MF, bool IsVarArg,
+    const SmallVectorImpl<ISD::OutputArg> &Outs, LLVMContext &Context,
+    const Type *RetTy) const {
+  SmallVector<CCValAssign, 4> Locations;
+  CCState Info(CallConv, IsVarArg, MF, Locations, Context);
+  return Info.CheckReturn(Outs, RetCC_DCPU16);
 }
 
 SDValue

@@ -199,6 +199,28 @@ class InstallationTests(unittest.TestCase):
             subprocess.run([sys.executable, str(tool), "link", *objects, "-o", str(image)], check=True, capture_output=True)
             result = subprocess.run([sys.executable, str(tool), "run", str(image), "--stop", "8"], check=True, capture_output=True, text=True)
             self.assertEqual(json.loads(result.stdout)["A"], 42)
+            # Exercise the installed wide runtime through the installed tools.
+            from test_runtime import program, execute, START
+            runtime = prefix / "share/llvm-dcpu16/runtime/dcpu16-rt.dco"
+            source = tmp / "divide.ll"
+            source.write_text(program(64, "sdiv"))
+            subprocess.run([str(compiler), str(source), "-O2", "-o", str(generated)],
+                           check=True, capture_output=True)
+            app = tmp / "divide.dco"
+            subprocess.run([sys.executable, str(tool), "assemble", "-c", str(generated), "-o", str(app)],
+                           check=True, capture_output=True)
+            start = tmp / "start.s"
+            start.write_text(START)
+            startup = tmp / "start.dco"
+            subprocess.run([sys.executable, str(tool), "assemble", "-c", str(start), "-o", str(startup)],
+                           check=True, capture_output=True)
+            mapping = tmp / "divide.map.json"
+            subprocess.run([sys.executable, str(tool), "link", str(startup), str(app), str(runtime),
+                            "-o", str(image), "--map", str(mapping)], check=True, capture_output=True)
+            import struct
+            words = list(struct.unpack(">" + "H" * (image.stat().st_size // 2), image.read_bytes()))
+            self.assertEqual(execute(words, json.loads(mapping.read_text()), 64, -0x123456789abcdef, 65537),
+                             (-(0x123456789abcdef // 65537)) & ((1 << 64) - 1))
 
 
 if __name__ == "__main__":

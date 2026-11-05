@@ -55,14 +55,29 @@ set_target_properties(dcpu16-llc PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE)
 enable_testing()
 find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+set(DCPU16_RUNTIME_DIR "${CMAKE_CURRENT_BINARY_DIR}/runtime")
+file(MAKE_DIRECTORY "${DCPU16_RUNTIME_DIR}")
+add_custom_command(OUTPUT "${DCPU16_RUNTIME_DIR}/division.s"
+  COMMAND $<TARGET_FILE:dcpu16-llc> "${CMAKE_CURRENT_SOURCE_DIR}/runtime/division.ll"
+    -O2 -o "${DCPU16_RUNTIME_DIR}/division.s"
+  DEPENDS dcpu16-llc "${CMAKE_CURRENT_SOURCE_DIR}/runtime/division.ll" VERBATIM)
+add_custom_command(OUTPUT "${DCPU16_RUNTIME_DIR}/dcpu16-rt.dco"
+  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/dcpu16.py"
+    assemble -c "${DCPU16_RUNTIME_DIR}/division.s" -o "${DCPU16_RUNTIME_DIR}/dcpu16-rt.dco"
+  DEPENDS "${DCPU16_RUNTIME_DIR}/division.s" tools/dcpu16.py tools/dcpu16_object.py VERBATIM)
+add_custom_target(dcpu16-runtime ALL DEPENDS "${DCPU16_RUNTIME_DIR}/dcpu16-rt.dco")
 set(DCPU16_CLANG_EXECUTABLE "" CACHE FILEPATH "Optional Clang with MSP430 support for C frontend tests")
 foreach(level IN ITEMS 0 2)
   add_test(NAME dcpu16-execution-O${level}
     COMMAND "${CMAKE_COMMAND}" -E env
       "DCPU16_LLC=$<TARGET_FILE:dcpu16-llc>" "DCPU16_OPT_LEVEL=${level}" "DCPU16_CLANG=${DCPU16_CLANG_EXECUTABLE}"
       "DCPU16_BUILD_DIR=${CMAKE_BINARY_DIR}"
+      "DCPU16_RUNTIME=${DCPU16_RUNTIME_DIR}/dcpu16-rt.dco"
       "${Python3_EXECUTABLE}" -m unittest discover -s "${CMAKE_CURRENT_SOURCE_DIR}/tests" -v)
 endforeach()
 install(TARGETS dcpu16-llc RUNTIME DESTINATION bin)
 install(PROGRAMS tools/dcpu16.py DESTINATION share/llvm-dcpu16)
 install(FILES tools/dcpu16_object.py DESTINATION share/llvm-dcpu16)
+
+install(FILES "${DCPU16_RUNTIME_DIR}/dcpu16-rt.dco" runtime/division.ll
+  DESTINATION share/llvm-dcpu16/runtime)

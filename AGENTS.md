@@ -47,3 +47,11 @@ combines them into a flat image. Read `docs/OBJECT_FORMAT.md` before changing th
 format. Keep local symbols scoped to each input object, defer symbol expressions
 until final placement, and reject incompatible ABI declarations and overflowing
 relocations. Install `dcpu16_object.py` beside `dcpu16.py` when packaging tools.
+
+## Integer runtime
+
+Read docs/RUNTIME.md for supplied i32/i64 division/remainder helpers. Runtime
+objects must be linked explicitly; CMake builds and installs dcpu16-rt.dco.
+Preserve the inherited high-word-first register returns (arguments and memory
+are low-word first). i64 returns use a hidden result pointer. Keep Select16's
+implicit EX use: without it, optimized code can reuse invalid comparisons.

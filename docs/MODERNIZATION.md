@@ -93,3 +93,23 @@ Linker implementation and the bootstrap-layout install fix are verified at
 https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/41977019496
 The installed compiler explicitly retains LLVM_LIBRARY_DIRS, including SDKs
 inside the project that automatic RPATH discovery would exclude.
+
+## Freestanding runtime progress (2026-11-05)
+
+The build now supplies an explicitly linked octet16 runtime object for signed
+and unsigned i32/i64 division and remainder. Modern LLVM libcall initialization
+selects these implementations without requiring an upstream DCPU triple.
+Generic hidden result pointers enable i64 returns. Argument grouping now handles
+LLVM's hidden first argument and its sentinel original index.
+
+Execution exposed a missing EX use on the select pseudo instruction: optimization
+could remove a comparison despite later selects depending on its result. That
+metadata is corrected. The ABI documentation now accurately describes inherited
+high-word-first register returns, verified by a physical-register test.
+
+The suites contain 38 methods per optimization level, including independent
+runtime compilation, full-result arithmetic comparison, built runtime execution,
+and installed runtime linking. Local LLVM 23.1.4 and LLVM 22.1.8 suites pass at
+O0/O2 with the optional C frontend bridge enabled. See RUNTIME.md for scope and
+helper edge behavior. Complete compiler-rt, native bytes, Clang and device SDK
+work remain open. Remote verification for this implementation is pending.

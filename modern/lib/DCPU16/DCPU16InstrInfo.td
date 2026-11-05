@@ -112,7 +112,8 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i16imm:$amt1, i16imm:$amt2),
                               [(DCPU16callseq_end timm:$amt1, timm:$amt2)]>;
 }
 
-let usesCustomInserter = 1 in {
+// Keep compare results live until the custom inserter creates the branch.
+let usesCustomInserter = 1, Uses = [EX] in {
   def Select16 : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR16:$src2, i16imm:$cc),
                         "# Select16 PSEUDO",
                         [(set GR16:$dst,

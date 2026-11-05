@@ -91,6 +91,22 @@ addresses. Compiler output carries an ABI declaration; contradictory assembler
 flags and mixed-ABI objects are rejected. See [the object format](docs/OBJECT_FORMAT.md)
 for supported relocations and limitations.
 
+## Integer runtime
+
+The build produces `build-modern/dcpu16-build/modern/runtime/dcpu16-rt.dco`.
+Link it after your application objects when using signed or unsigned i32/i64
+integer division or remainder:
+
+```sh
+python3 modern/tools/dcpu16.py link start.dco app.dco \
+  build-modern/dcpu16-build/modern/runtime/dcpu16-rt.dco -o program.bin
+```
+
+Installation places the object and its LLVM IR source under
+`share/llvm-dcpu16/runtime/`. See [runtime support](docs/RUNTIME.md) for symbols,
+edge behavior, and limitations. This is a freestanding integer runtime; a hosted
+C library and floating-point support remain open.
+
 ## C frontend bridge
 
 Clang's MSP430 frontend has a compatible octet/int16/pointer16 data layout. It can

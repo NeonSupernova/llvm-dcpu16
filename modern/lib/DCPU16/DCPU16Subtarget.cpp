@@ -13,6 +13,7 @@
 
 #include "DCPU16Subtarget.h"
 #include "DCPU16.h"
+#include "llvm/CodeGen/LibcallLoweringInfo.h"
 #include "llvm/MC/TargetRegistry.h"
 
 using namespace llvm;
@@ -24,6 +25,19 @@ using namespace llvm;
 #include "DCPU16GenSubtargetInfo.inc"
 
 void DCPU16Subtarget::anchor() {}
+
+void DCPU16Subtarget::initLibcallLoweringInfo(LibcallLoweringInfo &Info) const {
+  // The standalone target has no upstream triple/runtime profile. Select the
+  // integer helpers supplied by our freestanding runtime explicitly.
+  Info.setLibcallImpl(RTLIB::UDIV_I32, RTLIB::impl___udivsi3);
+  Info.setLibcallImpl(RTLIB::SDIV_I32, RTLIB::impl___divsi3);
+  Info.setLibcallImpl(RTLIB::UREM_I32, RTLIB::impl___umodsi3);
+  Info.setLibcallImpl(RTLIB::SREM_I32, RTLIB::impl___modsi3);
+  Info.setLibcallImpl(RTLIB::UDIV_I64, RTLIB::impl___udivdi3);
+  Info.setLibcallImpl(RTLIB::SDIV_I64, RTLIB::impl___divdi3);
+  Info.setLibcallImpl(RTLIB::UREM_I64, RTLIB::impl___umoddi3);
+  Info.setLibcallImpl(RTLIB::SREM_I64, RTLIB::impl___moddi3);
+}
 
 DCPU16Subtarget &
 DCPU16Subtarget::initializeSubtargetDependencies(StringRef CPU, StringRef FS) {

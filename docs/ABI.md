@@ -36,12 +36,19 @@ do not imply implemented floating-point operations.
   the stack; after one argument spills, subsequent arguments use the stack.
 - Stack pieces occupy two octets, aligned to two octets. JSR pushes the hardware
   return PC; the first stack argument follows it.
-- Return pieces occupy A, B, C, low-word first. Large aggregate returns and
-  wide operations need further validation; do not assume all possible LLVM
-  signatures and runtime helper calls are available.
+- Register return pieces occupy A, B, C, **high-word first**. For example,
+  i32 `0x12345678` returns A=`0x1234`, B=`0x5678`. This preserves the inherited
+  version-1 convention; argument word order differs. Previous documentation
+  incorrectly stated low-word-first returns.
+- Results requiring more than three register pieces use LLVM's hidden result
+  pointer. It occupies the first argument slot; the callee stores the result
+  through that octet pointer in ordinary low-word-first memory order. i64
+  arithmetic and helper calls exercise this path. Other aggregate signatures
+  still require their own validation.
 - X, Y, Z, I, J are callee saved. A, B, C and EX may be clobbered by calls.
 - The emitted assembly contains functions only. The embedder supplies startup,
   stack/heap placement, termination, peripherals, and any external runtime calls.
+  The supplied freestanding division object is linked explicitly; see RUNTIME.md.
 
 ## Memory access and I/O
 

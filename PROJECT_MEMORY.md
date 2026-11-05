@@ -140,3 +140,40 @@ project-local SDK, and the default-bootstrap CI install tests now pass.
 No release is authorized. Remaining SDK work includes native non-octet bytes,
 native LLVM object emission, wide runtime helpers, device/interrupt support,
 native Clang, and Nyet integration.
+
+## Freestanding integer runtime continuation (2026-11-05)
+
+Implemented i32/i64 signed/unsigned division/remainder helpers in
+modern/runtime/division.ll. CMake builds an O2 dcpu16-rt.dco and installs it plus
+source under share/llvm-dcpu16/runtime. Linking is explicit, with no automatic
+helper overrides or archive extraction. docs/RUNTIME.md explains usage/semantics.
+
+Backend changes:
+- DCPU16Subtarget::initLibcallLoweringInfo explicitly maps the eight helpers;
+  unknown upstream triples otherwise have no available runtime implementations.
+- CanLowerReturn checks the return CC; LLVM generically demotes >3-word returns
+  to a hidden first result pointer, enabling i64 results.
+- ParseFunctionArgs handles the first hidden argument's ~0U original index and
+  tracks actual OrigArgIndex values rather than incrementing an assumed index.
+- Select16 now declares Uses=[EX]. O2 execution exposed reused comparison results
+  after intervening EX writes. O0 passed before this metadata fix; O2 did not.
+- The existing version-1 i32 register return order is HIGH word in A, LOW in B;
+  arguments and memory remain low-first. Preserve binary behavior. Prior ABI.md
+  text was wrong; physical register execution now guards the documented order.
+
+Local validation: 38 methods per optimization level, O0/O2 passed against both
+assertion-enabled LLVM 23.1.4 and Homebrew LLVM 22.1.8, optional Clang bridge on.
+New tests compare full wide results against Python, cover signed extrema,
+high-bit divisors, deterministic random pairs, helper zero/overflow behavior,
+i64 inline multiply/shifts/add, built runtime, installed compile/link/runtime.
+Staging source: /private/tmp/dcpu-runtime-work.
+Builds: /private/tmp/dcpu-runtime-build23/dcpu16-build and
+/private/tmp/dcpu-runtime-build22/dcpu16-build. O2 runtime is 3551 hardware words
+with LLVM 23 on this host; no archive/section stripping yet.
+
+A diagnostic -verify-machineinstrs probe also identified a preexisting tied-use
+frame-index representation in ADD16ri before frame elimination. Normal builds
+and executions pass; strict machine-verifier cleanup remains separate work.
+Remote implementation CI verification is pending. No release was published.
+Native non-octet bytes, native LLVM objects, native Clang, full compiler-rt/libc,
+peripherals/interrupts, and Nyet integration remain open.
