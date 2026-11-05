@@ -48,7 +48,11 @@ if(LLVM_ENABLE_ASSERTIONS)
 endif()
 add_executable(dcpu16-llc tools/dcpu16-llc.cpp)
 target_link_libraries(dcpu16-llc PRIVATE DCPU16CodeGen LLVM)
-set_target_properties(dcpu16-llc PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+# Bootstrapped LLVM can live inside this source tree, which the automatic
+# link-path property excludes. Preserve that SDK location explicitly too.
+set_target_properties(dcpu16-llc PROPERTIES
+  INSTALL_RPATH "${LLVM_LIBRARY_DIRS}"
+  INSTALL_RPATH_USE_LINK_PATH TRUE)
 enable_testing()
 find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 set(DCPU16_CLANG_EXECUTABLE "" CACHE FILEPATH "Optional Clang with MSP430 support for C frontend tests")

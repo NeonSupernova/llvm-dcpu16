@@ -188,7 +188,8 @@ class InstallationTests(unittest.TestCase):
             compiler = prefix / "bin" / ("dcpu16-llc" + Path(os.environ.get("DCPU16_LLC", "")).suffix)
             tool = prefix / "share/llvm-dcpu16/dcpu16.py"
             generated = tmp / "add.s"
-            subprocess.run([str(compiler), str(examples / "add.ll"), "-o", str(generated)], check=True, capture_output=True)
+            compiled = subprocess.run([str(compiler), str(examples / "add.ll"), "-o", str(generated)], capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
             objects = []
             for index, source in enumerate((examples / "start.s", generated)):
                 obj = tmp / f"{index}.dco"
