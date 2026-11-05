@@ -125,7 +125,18 @@ Read docs/OBJECT_FORMAT.md before changing the versioned schema or relocations.
   shared globals, stored function pointers, both binary word orders, and installed
   toolchain execution pass. The optional Clang bridge is enabled locally.
 
-The initial-port CI run above remains the last recorded remote validation until
-this continuation is pushed and its workflow checked. No release is authorized.
-Remaining SDK work includes native non-octet bytes, native LLVM object emission,
-wide runtime helpers, device/interrupt support, native Clang, and Nyet integration.
+The linker continuation is verified at implementation commit
+4110de2e9bab203d970c0efde07c84241cca596b. Its actual Ubuntu and macOS source
+bootstrap/build/O0/O2/installation CI jobs passed:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/41977019496
+
+The first linker commit (54c98eac) exposed a CI-only installation failure:
+CMake's automatic link-path RPATH property excludes SDK directories inside the
+source project, which is exactly where the default bootstrap places LLVM.
+The fix explicitly sets INSTALL_RPATH to LLVM_LIBRARY_DIRS as well. Do not remove
+that setting as redundant; an installed executable was also verified against a
+project-local SDK, and the default-bootstrap CI install tests now pass.
+
+No release is authorized. Remaining SDK work includes native non-octet bytes,
+native LLVM object emission, wide runtime helpers, device/interrupt support,
+native Clang, and Nyet integration.

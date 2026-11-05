@@ -87,3 +87,9 @@ This completes reference object/static-link integration for the current ABI.
 Native LLVM MC/ELF object generation remains a separate task. Common/weak symbols,
 archives and section garbage collection are not implemented by the reference
 linker. The full SDK and non-octet-core milestones remain open.
+
+Linker implementation and the bootstrap-layout install fix are verified at
+4110de2e9bab203d970c0efde07c84241cca596b by successful Ubuntu and macOS CI:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/41977019496
+The installed compiler explicitly retains LLVM_LIBRARY_DIRS, including SDKs
+inside the project that automatic RPATH discovery would exclude.
