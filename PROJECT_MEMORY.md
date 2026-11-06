@@ -296,3 +296,32 @@ syntax checks passed for both modified utility sources and both C++ test files.
 The full local script's three groups pass again. Corrected remote CI is pending.
 The scoped patch-file whitespace attribute also permits valid blank context
 lines at the end of unified diffs; ordinary source whitespace checks stay on.
+
+## Nyet frontend boundary validation (2026-11-06)
+
+While answering integration readiness, tested actual current Nyet emitted IR
+without modifying the Nyet checkout (which has unrelated user changes).
+- Nyet entry(a:i16,b:i16) addition compiled and ran as DCPU machine words: 20+22=42.
+- An i32 divide(a,b) and entry()->divide(100000,7) initially returned 0 at O0.
+  Layout-free IR was parsed before assigning the target DL, so implicit i32
+  allocas inherited host align4. The backend cannot realign that stack and could
+  make invalid aligned-address assumptions.
+- Driver now constructs TM first and supplies ParserCallbacks.DataLayout only
+  when the input has no DL. LLVM resolves omitted instruction alignments against
+  the target while parsing. Explicit incompatible layouts are still rejected.
+  Explicit stack align >2 octets is diagnosed until realignment is implemented.
+- New implicit-alignment execution and unsupported-alignment diagnostic bring the
+  suites to 40 methods at O0/O2. LLVM 23.1.4 and 22.1.8 local suites pass with the
+  optional Clang bridge and installed tools/runtime checks enabled.
+- Actual Nyet division now passes at O0 and O2 through compiler, CLI assemble -c,
+  CLI link with startup + separate dcpu16-rt.dco, flat binary, and CPU CLI:
+  A=0, B=14285 (v1 high-first i32 return). O0 executes the real integer helper.
+- Artifacts: /private/tmp/dcpu-nyet-proof. Current unpatched-SDK backend builds:
+  /private/tmp/dcpu-frontend-build23 and /private/tmp/dcpu-frontend-build22.
+- docs/NYET_INTEGRATION.md has reproducing commands and the remaining consumer
+  work: Nyet target driver/profile, entry/startup, bounded allocator, supported
+  string/container runtime and I/O/device contracts. Native word16 is not needed
+  for the first octet16 demo. No Nyet source file was changed.
+
+Frontend fix remote CI is pending. Core continuation CI remains a separate
+verification of the patched LLVM experiment; it does not validate native codegen.

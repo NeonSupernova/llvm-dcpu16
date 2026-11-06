@@ -71,3 +71,9 @@ Core tests execute expanded scalar loops using LLVM's interpreter after adapting
 pointers and GEP indices to its host interface. Treat this as loop-semantics
 coverage, not native DCPU execution. llvm.memset's i8 value is zero-extended per
 native unit; native C full-word fill needs a separate frontend/runtime contract.
+
+For layout-free IR, supply the target DataLayout through the IR-reader callback
+before parsing instructions. Assigning it only after parsing leaves implicit
+host stack/load/store alignments in place. Preserve explicit input layouts for
+compatibility checks; do not override mismatches. Stack realignment is currently
+unsupported: reject explicit alloca alignment above two octets.

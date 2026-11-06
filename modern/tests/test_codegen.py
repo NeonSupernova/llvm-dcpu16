@@ -296,6 +296,12 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("data layout does not match", result.stderr)
 
+    def test_unsupported_stack_realignment(self):
+        ir = 'define i16 @entry() { %p = alloca i32, align 4 ret i16 0 }'
+        result = subprocess.run([COMPILER], input=ir, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("unsupported stack realignment", result.stderr)
+
     def test_float_diagnostic(self):
         result = subprocess.run([COMPILER], input='define float @entry() { ret float 1.0 }\n', capture_output=True, text=True)
         self.assertEqual(result.returncode, 1)

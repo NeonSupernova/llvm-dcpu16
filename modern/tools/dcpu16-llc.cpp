@@ -102,9 +102,12 @@ static bool validateInput(Module &M) {
                S->getAlign() < Align(2)))
             return Error("volatile memory requires aligned i16 accesses");
         }
-        if (auto *A = dyn_cast<AllocaInst>(&I))
+        if (auto *A = dyn_cast<AllocaInst>(&I)) {
           if (!A->isStaticAlloca())
             return Error("dynamic stack allocation is not yet supported");
+          if (A->getAlign() > Align(2))
+            return Error("stack alignment above two octets requires unsupported stack realignment");
+        }
         if (isa<InvokeInst, ResumeInst, LandingPadInst, IndirectBrInst,
                 CallBrInst>(I))
           return Error("exception handling and indirect branch instructions "
@@ -132,17 +135,8 @@ int main(int argc, char **argv) {
   LLVMInitializeDCPU16Target();
   LLVMInitializeDCPU16TargetMC();
   LLVMInitializeDCPU16AsmPrinter();
-  LLVMContext Context;
-  SMDiagnostic Diagnostic;
-  auto M = parseIRFile(Input, Diagnostic, Context);
-  if (!M) {
-    Diagnostic.print(argv[0], errs());
-    return 1;
-  }
-  if (verifyModule(*M, &errs()))
-    return 1;
-  if (!validateInput(*M))
-    return 1;
+  // Construct the target before parsing. LLVM resolves omitted load/store and
+  // alloca alignments during parsing, not when setDataLayout is called later.
   TargetOptions Options;
   auto TM =
       std::unique_ptr<TargetMachine>(getTheDCPU16Target().createTargetMachine(
@@ -153,6 +147,23 @@ int main(int argc, char **argv) {
     errs() << "unable to create DCPU16 target\n";
     return 1;
   }
+  LLVMContext Context;
+  SMDiagnostic Diagnostic;
+  ParserCallbacks Callbacks([&](StringRef, StringRef Layout)
+                                -> std::optional<std::string> {
+    if (Layout.empty())
+      return TM->createDataLayout().getStringRepresentation();
+    return std::nullopt;
+  });
+  auto M = parseIRFile(Input, Diagnostic, Context, Callbacks);
+  if (!M) {
+    Diagnostic.print(argv[0], errs());
+    return 1;
+  }
+  if (verifyModule(*M, &errs()))
+    return 1;
+  if (!validateInput(*M))
+    return 1;
   if (!M->getDataLayoutStr().empty() &&
       M->getDataLayout() != TM->createDataLayout()) {
     errs() << "error: input data layout does not match the DCPU16 ABI\n";

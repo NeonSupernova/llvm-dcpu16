@@ -104,6 +104,25 @@ class RuntimeTests(unittest.TestCase):
                           ('ashr', [(-0x123456789abcdef, x) for x in (0, 1, 16, 32, 63)])]:
             self.check_operation(64, op, pairs)
 
+    def test_frontend_ir_with_implicit_stack_alignment(self):
+        # Match layout-free textual frontend IR (including Nyet): alignments
+        # omitted here must be resolved using the DCPU layout during parsing.
+        ir = program(32, 'sdiv').replace('%r = sdiv i32 %a, %b', """
+          %left = alloca i32
+          %right = alloca i32
+          store i32 %a, ptr %left
+          store i32 %b, ptr %right
+          %x = load i32, ptr %left
+          %y = load i32, ptr %right
+          %r = sdiv i32 %x, %y
+        """)
+        image, mapping = link_objects([assemble_object(START),
+                                      assemble_object(compile_ir(ir)), self.runtime])
+        for a, b, expected in [(100000, 7, 14285), (-100000, 7, -14285),
+                               (0x12345678, 257, 0x12345678 // 257)]:
+            with self.subTest(a=a, b=b):
+                self.assertEqual(execute(image, mapping, 32, a, b), expected & 0xffffffff)
+
     def test_physical_return_register_order(self):
         assembly = compile_ir('define i32 @entry() { ret i32 305419896 }')
         cpu = invoke(assembly, 'entry')
