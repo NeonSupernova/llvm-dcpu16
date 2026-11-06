@@ -13,8 +13,8 @@ Verified examples (2026-11-06):
   runtime, link, and execute with result 14285. O0 keeps the runtime call live.
 
 These examples establish a frontend/backend boundary, not full language/runtime
-support or a built-in Nyet target option. The frontend checkout has unrelated
-local changes; the proof used its current emitted IR and left it unchanged.
+support or a built-in Nyet target option. Nyet is not pinned as a toolchain
+dependency; these commands require a compatible frontend checkout.
 
 ## Reproduce the i32 runtime example
 

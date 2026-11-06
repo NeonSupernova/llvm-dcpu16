@@ -149,3 +149,25 @@ of expanded loops with high-bit data, overlap, zero lengths and guard regions.
 Both octet and native paths pass locally. Interpreter execution uses host-adapted
 pointers/indices after native IR validation; native code generation and complete
 optimization pipelines remain pending. Read WORD16.md before enabling any mode.
+
+The corrected four-patch core series passed verified-source bootstrap, GCC build
+and all three CTest groups on Ubuntu at ea37d375:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42180910683
+An initial build caught a missing complete-Module declaration masked by Clang's
+PCH; the correction uses the existing function-level DataLayout accessor and
+also passed explicit no-PCH Clang/GCC checks locally.
+
+## Nyet boundary progress (2026-11-06)
+
+Actual Nyet arithmetic IR now executes as DCPU machine words, including i32
+integer division linked with the separate runtime at O0 and O2. This exposed
+and fixed late DataLayout assignment: implicit instruction alignments must use
+the target during IR parsing. Explicit unsupported stack realignment is rejected.
+
+The backend suites now have 40 methods per optimization level. Local LLVM 22/23
+suites pass; Ubuntu bootstrap/O0/O2/installation CI passed d852b957:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42182863602
+The macOS CI job was cancelled; local macOS coverage passed. Read
+[NYET_INTEGRATION.md](NYET_INTEGRATION.md) for verified commands and remaining
+driver, layout/profile and freestanding runtime integration. Nyet source was
+not changed. Native word16 still needs the outstanding optimizer/codegen audit.

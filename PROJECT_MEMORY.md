@@ -270,7 +270,10 @@ Appended core patches 3/4; original/patched hashes updated in series.json.
   (layout-tests was reconfigured for the new staging source; its old cache was
   moved to layout-tests-initial). Additional test build: /private/tmp/dcpu-optimizer-tests.
 
-Remote verification of this continuation is pending. Native --byte-size=16 is
+Corrected core continuation is verified at ea37d375c7e0b80f62da44c41aad63ba82a2501e:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42180910683
+The verified-source bootstrap, GCC build and all three groups passed on Ubuntu.
+Native --byte-size=16 is
 still disabled. Next: SROA and the full GVN/InstCombine/value-tracking audit,
 followed by SelectionDAG/frame/emitter and native object/runtime execution.
 
@@ -293,7 +296,8 @@ it. Replaced the access with getFunction()->getDataLayout, matching existing
 helpers in that file, and updated patch/source checksums. A Clang no-PCH syntax
 check reproduced the original error and passed after the fix. GCC 16 no-PCH
 syntax checks passed for both modified utility sources and both C++ test files.
-The full local script's three groups pass again. Corrected remote CI is pending.
+The full local script's three groups pass again. The corrected Ubuntu GCC core
+build and tests passed at ea37d375; see the verification link above.
 The scoped patch-file whitespace attribute also permits valid blank context
 lines at the end of unified diffs; ordinary source whitespace checks stay on.
 
@@ -323,5 +327,10 @@ without modifying the Nyet checkout (which has unrelated user changes).
   string/container runtime and I/O/device contracts. Native word16 is not needed
   for the first octet16 demo. No Nyet source file was changed.
 
-Frontend fix remote CI is pending. Core continuation CI remains a separate
-verification of the patched LLVM experiment; it does not validate native codegen.
+Frontend fix d852b957362a01a39072b04dc0776b97dafe9b5a passed Ubuntu source-bootstrap,
+O0/O2/installation CI (40 methods per level, optional Clang bridge skipped remotely):
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42182863602
+The macOS job was cancelled before execution; local macOS LLVM 22/23 tests and
+Nyet CLI binary proofs supply that platform's evidence. Core continuation CI is
+a separate verification of the patched experiment; it does not validate native
+codegen. Both verified implementation commits are pushed. No release published.
