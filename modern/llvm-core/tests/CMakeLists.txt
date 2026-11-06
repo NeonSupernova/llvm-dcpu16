@@ -24,3 +24,8 @@ target_compile_options(dcpu16-optimizer-memory PRIVATE ${LLVM_DEFINITIONS_LIST} 
 target_link_libraries(dcpu16-optimizer-memory PRIVATE LLVMTransformUtils LLVMInterpreter LLVMAsmParser LLVMAnalysis LLVMCore)
 add_test(NAME dcpu16-native-coercion COMMAND dcpu16-optimizer-memory coercion)
 add_test(NAME dcpu16-native-loops COMMAND dcpu16-optimizer-memory loops)
+add_executable(dcpu16-sroa-units sroa-units.cpp)
+target_include_directories(dcpu16-sroa-units SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+target_compile_options(dcpu16-sroa-units PRIVATE ${LLVM_DEFINITIONS_LIST} -fno-rtti)
+target_link_libraries(dcpu16-sroa-units PRIVATE LLVMScalarOpts LLVMAsmParser LLVMAnalysis LLVMCore)
+add_test(NAME dcpu16-sroa-units COMMAND dcpu16-sroa-units "${CMAKE_CURRENT_SOURCE_DIR}/../probes/sroa-native.ll")

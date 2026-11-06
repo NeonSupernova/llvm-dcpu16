@@ -108,7 +108,7 @@ def main():
         '-DLLVM_ENABLE_ZSTD=OFF', '-DLLVM_ENABLE_ZLIB=OFF', '-DLLVM_ENABLE_LIBXML2=OFF',
         '-DPython3_EXECUTABLE=' + sys.executable)
     run('cmake', '--build', build, '--target', 'LLVMCore', 'LLVMAsmParser',
-        'LLVMBitReader', 'LLVMBitWriter', 'LLVMTransformUtils', 'LLVMInterpreter', '-j', args.jobs)
+        'LLVMBitReader', 'LLVMBitWriter', 'LLVMTransformUtils', 'LLVMInterpreter', 'LLVMScalarOpts', '-j', args.jobs)
     tests = work / 'layout-tests'
     run('cmake', '-S', CORE / 'tests', '-B', tests, '-G', 'Ninja',
         '-DLLVM_DIR=' + str(build / 'lib/cmake/llvm'))

@@ -76,7 +76,7 @@ python3 modern/scripts/test_word_layout.py \
 ```
 
 This builds the required static LLVM components, including transformation
-utilities and the interpreter, and two independent C++ test programs. Tests cover integer widths and storage, alignments,
+utilities and the interpreter, and three independent C++ test programs. Tests cover integer widths and storage, alignments,
 struct/array layout, pointers, GEP, invalid specifications, copy/cache behavior,
 textual/bitcode round trips, endian-sensitive constant loads, subword padding,
 and independent octet/native layouts. Additional tests cover forwarding offsets,
@@ -96,7 +96,9 @@ on macOS.
 | Module-local state, copies, textual/bitcode persistence | Patched and tested |
 | Constant initializer load reinterpretation | Native-unit folding tested; unsafe host-octet extraction declined |
 | GVN coercion utilities: offsets, bounds, extraction and memset forwarding | Patched; targeted utility checks pass |
-| SROA, whole GVN/InstCombine pipelines, value tracking, other memory optimizations | Audit/port pending |
+| SROA slice sizes, scalar extraction/insertion, fallback storage and memset splats | Patched; 121 pass-level scalar-return cases, both unit sizes and endiannesses |
+| SROA complex CFG/debug metadata and broader bit-packed vector cases | Further validation pending |
+| Whole GVN/InstCombine pipelines, value tracking, other memory optimizations | Audit/port pending |
 | Non-atomic scalar memcpy/memmove/memset expansion | Full native-unit accesses and i8 zero-extended fill tested at IR level |
 | Target-widened/atomic/pattern memory intrinsics and native C full-word fill | Pending |
 | SelectionDAG value storage, split memory operations and offsets | Pending |
@@ -110,9 +112,19 @@ optimized frontend/IR-to-binary execution, pointer and memory tests, independent
 linked runtime objects, and mixed-ABI rejection. The existing octet16 suite must
 continue to pass against unpatched LLVM 22 and 23.
 
-A concrete remaining SROA failure is preserved in
-`modern/llvm-core/probes/sroa-native.ll`. Running the current SROA pass on its
-native i32 store/second-word i16 load produces an i8 store of 0x33 followed by
-an i16 load, instead of preserving the required value 0x1122. This was reproduced
-with the patched core and standard SROAPass analyses. The fixture is a known
-failing audit input, not a passing test or native-codegen support claim.
+The former SROA failure is preserved in
+`modern/llvm-core/probes/sroa-native.ll` and now runs as a positive regression.
+Before patch 5, an i32 store followed by a second-word i16 load became an i8
+store of 0x33 and an i16 load, losing the required 0x1122 result. Patch 5 converts
+slice widths, extraction/insertion shifts, native-unit fallback storage, vector
+eligibility and memset splats to the module's addressable units. Semantic i8
+values retain eight bits and their native storage padding is respected.
+
+SROA tests run the real pass, verify its output IR, then fold constant arithmetic
+and check the resulting scalar returns. Cases cover 32/64-bit extraction and
+partial writes, both endiannesses, mixed and packed structs, i8/i24 padding,
+scalar/vector reinterpretation, partial memcpy/memset, and the original fixture.
+These are targeted optimizer checks, not native machine-code execution or proof
+that the complete O2 pipeline is ready. There are 345 checks across four CTest
+groups. Complex CFGs, debug metadata quality and additional bit-packed vector
+cases need further validation, along with the remaining audit areas above.

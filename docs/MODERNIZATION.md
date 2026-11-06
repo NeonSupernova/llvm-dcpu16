@@ -171,3 +171,17 @@ The macOS CI job was cancelled; local macOS coverage passed. Read
 [NYET_INTEGRATION.md](NYET_INTEGRATION.md) for verified commands and remaining
 driver, layout/profile and freestanding runtime integration. Nyet source was
 not changed. Native word16 still needs the outstanding optimizer/codegen audit.
+
+## SROA progress (2026-11-06)
+
+The fifth isolated core patch converts SROA partition/slice sizes, integer
+extraction/insertion, replacement storage, vector unit checks and memset splats
+to the module's addressable unit. The recorded native second-word load failure
+is now a positive regression. Semantic i8/i24 widths and padding stay intact.
+
+The core suite now runs 121 SROA pass-level cases in addition to the prior 224
+checks: 345 total in four groups. Both unit sizes and endiannesses, partial
+writes/copies/fills, mixed and packed structs, padding, scalar/vector cases and
+the original reproducer pass locally. Fresh patch application and no-PCH
+Clang/GCC checks pass too. The full optimizer pipeline and native code generation
+remain pending; see WORD16.md for the remaining audit boundaries.

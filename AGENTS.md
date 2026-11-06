@@ -77,3 +77,9 @@ before parsing instructions. Assigning it only after parsing leaves implicit
 host stack/load/store alignments in place. Preserve explicit input layouts for
 compatibility checks; do not override mismatches. Stack realignment is currently
 unsupported: reject explicit alloca alignment above two octets.
+
+The core suite now includes real SROAPass tests. Preserve semantic i8/i24 widths
+and padding checks while converting memory slice units; a native storage unit
+is not an integer-width override. The old SROA probe is now a required positive
+fixture. Scalar-return tests fold constant arithmetic after SROA, not a second
+unaudited memory optimization pass. Full native code generation stays disabled.

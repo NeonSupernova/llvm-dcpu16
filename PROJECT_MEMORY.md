@@ -334,3 +334,36 @@ The macOS job was cancelled before execution; local macOS LLVM 22/23 tests and
 Nyet CLI binary proofs supply that platform's evidence. Core continuation CI is
 a separate verification of the patched experiment; it does not validate native
 codegen. Both verified implementation commits are pushed. No release published.
+
+## SROA addressable-unit continuation (2026-11-06)
+
+Appended core patch 5 (0005-native-unit-sroa.patch), with source/patch hashes in
+series.json. Converts scalar partition widths, split loads/stores, extract and
+insert shifts, vector element/storage checks, fallback arrays and debug-unit
+conversions to DataLayout's module-local addressable width. getIntegerSplat now
+zero-extends memset's i8 into each native unit. findCommonType compares actual
+store size, preserving the semantic i8 eligibility rule and existing padding
+checks instead of reinterpreting i8 as a 16-bit integer.
+
+The old failing native SROA fixture is now a positive test. The new executable
+runs the real SROAPass with its normal analyses, verifies the result, folds only
+constant instructions and compares scalar returns. 121 cases cover both B8/B16
+and little/big endian, i32/i64 extraction and partial writes, mixed/packed
+structs, i8/i24 padding, scalar/vector reinterpretation, partial memcpy/memset,
+and the original fixture. All 4 groups pass locally: 86+10+128+121 = 345 checks.
+The full validation script passed, as did fresh five-patch application and exact
+repeat. Clang/GCC16 no-PCH syntax checks passed for SROA.cpp; GCC16 also accepted
+the new test source. The initial suite failed on the pre-patch core as expected.
+
+Staging: /private/tmp/dcpu-sroa-work. Patched source remains
+/private/tmp/dcpu-llvm-word-src; pristine source and ordinary SDK remain untouched.
+Build: /private/tmp/dcpu-word-core-validation. Its layout-tests is reconfigured
+for this source; prior tests are archived at layout-tests-optimizer. Additional
+test build: /private/tmp/dcpu-sroa-tests. The script now builds LLVMScalarOpts.
+
+This fixes the recorded SROA scalar regression and broadens unit-conversion
+coverage. It does NOT enable --byte-size=16 or validate a complete optimizer
+pipeline. Complex CFG/debug metadata and broader bit-packed vector cases remain
+to validate. Next audit: real GVN/InstCombine and value tracking, then SelectionDAG,
+frame/emitter, object/runtime integration and native emulator execution.
+Remote SROA continuation verification is pending.
