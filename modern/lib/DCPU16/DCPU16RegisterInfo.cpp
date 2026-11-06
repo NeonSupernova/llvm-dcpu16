@@ -106,7 +106,7 @@ bool DCPU16RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // Fold imm into offset
   Offset += MI.getOperand(FIOperandNum + 1).getImm();
 
-  if (MI.getOpcode() == DCPU16::ADD16ri) {
+  if (MI.getOpcode() == DCPU16::LEA16fi) {
     // This is actually "load effective address" of the stack slot
     // instruction. We have only two-address instructions, thus we need to
     // expand it into mov + add
@@ -114,6 +114,12 @@ bool DCPU16RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
     MI.setDesc(TII.get(DCPU16::MOV16rr));
     MI.getOperand(FIOperandNum).ChangeToRegister(BasePtr, false);
+    MI.removeOperand(FIOperandNum + 1);
+    // MOV does not define EX; expansion below supplies the actual clobbers.
+    for (unsigned I = MI.getNumOperands(); I-- > 0;)
+      if (MI.getOperand(I).isReg() && MI.getOperand(I).isImplicit() &&
+          MI.getOperand(I).isDef() && MI.getOperand(I).getReg() == DCPU16::EX)
+        MI.removeOperand(I);
 
     auto Shift = BuildMI(MBB, std::next(II), dl, TII.get(DCPU16::SHL16ri),
                          MI.getOperand(0).getReg())

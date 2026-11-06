@@ -16,7 +16,7 @@ def compile_ir(ir):
     with tempfile.TemporaryDirectory() as tmp:
         source, output = Path(tmp) / "input.ll", Path(tmp) / "output.s"
         source.write_text(ir)
-        result = subprocess.run([COMPILER, str(source), "-O" + os.environ.get("DCPU16_OPT_LEVEL", "2"), "-o", str(output)], capture_output=True, text=True)
+        result = subprocess.run([COMPILER, str(source), "-verify-machineinstrs", "-O" + os.environ.get("DCPU16_OPT_LEVEL", "2"), "-o", str(output)], capture_output=True, text=True)
         if result.returncode:
             raise AssertionError(f"compiler failed ({result.returncode}):\n{result.stderr}")
         return output.read_text()

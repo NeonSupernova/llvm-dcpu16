@@ -181,3 +181,16 @@ Both jobs completed successfully. The optional Clang bridge is validated locally
 remote CI skips that optional method. No release was published.
 Native non-octet bytes, native LLVM objects, native Clang, full compiler-rt/libc,
 peripherals/interrupts, and Nyet integration remain open.
+
+## Strict machine verification (2026-11-05)
+
+Every execution-suite IR compilation and the packaged runtime build now use
+-verify-machineinstrs. Fixed inherited tied frame-index ADD operands with a
+LEA16fi pseudo, expanded at frame elimination into MOV/SHL/offset arithmetic.
+Direct symbol calls now select CALLi rather than register-only CALLr. Select
+custom insertion propagates the active call-frame size to newly created blocks.
+
+Local LLVM 23.1.4 and 22.1.8 builds pass 38 tests at each of O0/O2, including the
+optional C bridge and installed toolchain/runtime test. Staging/build paths:
+/private/tmp/dcpu-word-work and /private/tmp/dcpu-word-build{22,23}/dcpu16-build.
+The separate non-octet core port is next; --byte-size=16 remains rejected.

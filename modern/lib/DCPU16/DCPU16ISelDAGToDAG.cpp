@@ -316,12 +316,12 @@ void DCPU16DAGToDAGISel::Select(SDNode *Node) {
     int FI = cast<FrameIndexSDNode>(Node)->getIndex();
     SDValue TFI = CurDAG->getTargetFrameIndex(FI, MVT::i16);
     if (Node->hasOneUse()) {
-      CurDAG->SelectNodeTo(Node, DCPU16::ADD16ri, MVT::i16, TFI,
+      CurDAG->SelectNodeTo(Node, DCPU16::LEA16fi, MVT::i16, TFI,
                            CurDAG->getTargetConstant(0, dl, MVT::i16));
       return;
     }
     ReplaceNode(Node, CurDAG->getMachineNode(
-                          DCPU16::ADD16ri, dl, MVT::i16, TFI,
+                          DCPU16::LEA16fi, dl, MVT::i16, TFI,
                           CurDAG->getTargetConstant(0, dl, MVT::i16)));
     return;
   }

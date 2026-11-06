@@ -59,7 +59,7 @@ set(DCPU16_RUNTIME_DIR "${CMAKE_CURRENT_BINARY_DIR}/runtime")
 file(MAKE_DIRECTORY "${DCPU16_RUNTIME_DIR}")
 add_custom_command(OUTPUT "${DCPU16_RUNTIME_DIR}/division.s"
   COMMAND $<TARGET_FILE:dcpu16-llc> "${CMAKE_CURRENT_SOURCE_DIR}/runtime/division.ll"
-    -O2 -o "${DCPU16_RUNTIME_DIR}/division.s"
+    -verify-machineinstrs -O2 -o "${DCPU16_RUNTIME_DIR}/division.s"
   DEPENDS dcpu16-llc "${CMAKE_CURRENT_SOURCE_DIR}/runtime/division.ll" VERBATIM)
 add_custom_command(OUTPUT "${DCPU16_RUNTIME_DIR}/dcpu16-rt.dco"
   COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/dcpu16.py"

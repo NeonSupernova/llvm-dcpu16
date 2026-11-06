@@ -189,6 +189,10 @@ let isCall = 1 in
 
 
 //===----------------------------------------------------------------------===//
+// Direct symbol calls must use an immediate operand descriptor, not CALLr.
+def : Pat<(DCPU16call tglobaladdr:$dst), (CALLi tglobaladdr:$dst)>;
+def : Pat<(DCPU16call texternalsym:$dst), (CALLi texternalsym:$dst)>;
+
 //  Miscellaneous Instructions...
 //
 let Defs = [SP], Uses = [SP], hasSideEffects=0 in {
@@ -243,6 +247,12 @@ def MOV16mm : I16mm<0x0,
                     [(store (i16 (load addr:$src)), addr:$dst)]>;
 
 //===----------------------------------------------------------------------===//
+// Frame addresses survive until frame elimination. A frame index is not a
+// register and cannot be a tied operand of the two-address ADD instruction.
+let Defs = [EX], hasSideEffects = 0 in
+ def LEA16fi : Pseudo<(outs GR16:$dst), (ins memsrc:$address),
+                      "# LEA16fi", []>;
+
 // Integer comparisons
 let Defs = [EX] in {
 def CMP16rr : I16rr<0x0,

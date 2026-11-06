@@ -987,6 +987,10 @@ DCPU16TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
   MachineBasicBlock *copy1MBB = F->CreateMachineBasicBlock(LLVM_BB);
   F->insert(I, copy0MBB);
   F->insert(I, copy1MBB);
+  // A select may split the block between call-frame setup and teardown.
+  unsigned CallFrameSize = TII.getCallFrameSizeAt(MI);
+  copy0MBB->setCallFrameSize(CallFrameSize);
+  copy1MBB->setCallFrameSize(CallFrameSize);
   // Update machine-CFG edges by transferring all successors of the current
   // block to the new block which will contain the Phi node for the select.
   copy1MBB->splice(copy1MBB->begin(), BB,
