@@ -76,7 +76,7 @@ python3 modern/scripts/test_word_layout.py \
 ```
 
 This builds the required static LLVM components, including transformation
-utilities and the interpreter, and four independent C++ test programs. Tests cover integer widths and storage, alignments,
+utilities and the interpreter, and five independent C++ test programs. Tests cover integer widths and storage, alignments,
 struct/array layout, pointers, GEP, invalid specifications, copy/cache behavior,
 textual/bitcode round trips, endian-sensitive constant loads, subword padding,
 and independent octet/native layouts. Additional tests cover forwarding offsets,
@@ -100,7 +100,8 @@ on macOS.
 | SROA complex CFG/debug metadata and broader bit-packed vector cases | Further validation pending |
 | InstCombine intrinsic sizes/fills and GVN memory forwarding | 216 real-pass cases, including InstCombine→GVN sequences |
 | Memset-pattern value tracking and MemCpyOpt→InstCombine→GVN | 244 API/integration checks; unrepresentable native fills declined |
-| Full O2 pipeline, additional GVN/InstCombine transforms and other memory optimizations | Audit/port pending |
+| DSE overlapping constant-store merging | Known failing native-unit reproducer; offset still scales by eight |
+| Loop-idiom recognition and full O2 pipeline | Audit/port pending |
 | Non-atomic scalar memcpy/memmove/memset expansion | Full native-unit accesses and i8 zero-extended fill tested at IR level |
 | Target-widened/atomic/pattern memory intrinsics and native C full-word fill | Pending |
 | SelectionDAG value storage, split memory operations and offsets | Pending |
@@ -153,3 +154,41 @@ MemCpyOpt→InstCombine→GVN sequences, including MemorySSA/IR verification and
 scalar results. Its 244 checks bring the suite to 805 across six CTest groups
 (five C++ executables plus interpreter loop tests). These targeted checks do
 not certify the full O2 pipeline or enable native code generation.
+
+## Next verified blocker and code-generation audit
+
+A real DSEPass probe on the seven-patch core still miscompiles overlapping
+constant stores. With the native layout above:
+
+```llvm
+define i32 @entry(ptr %p) {
+  store i32 287454020, ptr %p, align 1 ; 0x11223344
+  %q = getelementptr i16, ptr %p, i16 1
+  store i16 43981, ptr %q, align 1    ; 0xabcd in the second word
+  %r = load i32, ptr %p, align 1
+  ret i32 %r
+}
+```
+
+The expected merged value is 0xabcd3344. DSE currently emits 0x11abcd44 because
+`tryToMergePartialOverlappingStores` in `DeadStoreElimination.cpp` multiplies
+the target-unit offset by eight. Its assignment-debug shortening also assumes
+eight-bit units. This is a known remaining failure, excluded from the 805 passing
+checks; it must become a positive real-pass regression when fixed.
+
+The code-generation audit identifies these next boundaries in pinned LLVM 23:
+
+| Boundary | Concrete conversion to audit |
+| --- | --- |
+| `ValueTypes.h` | EVT storage helpers round/divide by eight without a DataLayout; keep semantic bit widths independent and introduce explicit layout-aware storage queries |
+| `MachineMemOperand.h`, `MachineOperand.cpp`, `LowLevelType.h` | Machine memory sizes are represented through LLT octet conversions; constructor/getSize/bit-size consistency needs an explicit unit contract |
+| `SelectionDAG.cpp` | Stack temporary sizes and load/store memory operands call EVT octet storage helpers; inline copy/fill offsets also divide bit widths by eight |
+| `SelectionDAGBuilder.cpp` | Split argument/result offsets use EVT storage size; memory/atomic operands need the same target-unit convention |
+| `LegalizeIntegerTypes.cpp`, `LegalizeTypesGeneric.cpp`, `DAGCombiner.cpp` | Split loads/stores, temporary accesses and pointer increments still convert bit widths with octet assumptions |
+| DCPU `ISelLowering`, `FrameLowering`, `RegisterInfo` | Call slots allocate two octets, frames divide offsets by two, and pointer bridges shift between octet addresses and PC/SP words |
+| DCPU `AsmPrinter` and LLVM constant emission | Global pointers currently shift symbols left; native padded i8 arrays and physical assembler directives need explicit word-to-octet conversion |
+
+Change these in isolated, tested stages. A global change to EVT/LLT widths would
+leak across modules and alter semantic values. Register arithmetic, bswap and
+CRC bit algorithms retain their specified bit widths. Loop-idiom recognition
+also contains memory-size conversions requiring audit before a full O2 claim.

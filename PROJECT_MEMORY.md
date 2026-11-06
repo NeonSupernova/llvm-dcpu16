@@ -429,3 +429,20 @@ coverage, not the complete O2 pipeline or native DCPU execution. Continue with
 remaining optimizer and SelectionDAG/frame/emitter/object/runtime validation;
 --byte-size=16 must remain disabled until native optimized binary execution
 and mixed-ABI rejection pass.
+
+Seven-patch implementation pushed as df313376acf65eb021d0aa699beee188835a6f2e.
+Clean Ubuntu core CI is running at:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42260119316
+Ordinary backend workflow:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42260119263
+Do not treat in-progress CI as passed. Check these runs at the next continuation.
+
+Post-push audit found the next real failing optimizer case, before codegen:
+DSEPass merges i32 0x11223344 followed by i16 0xabcd at native GEP i16 offset 1
+into i32 0x11abcd44, instead of 0xabcd3344. Probe built/run against the exact
+seven-patch core at /private/tmp/dcpu-dse-probe. The fixed-octet offset is in
+tryToMergePartialOverlappingStores; assignment-debug shortening also uses *8.
+No DSE fix is claimed, and this failure is not counted in the passing suite.
+WORD16.md records reproducing IR and a concrete EVT/LLT/MMO/SelectionDAG/backend
+audit map. Fix DSE with a real pass-level regression next, then loop-idiom and
+remaining pipeline conversions before native codegen acceptance.
