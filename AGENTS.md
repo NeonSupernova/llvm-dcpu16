@@ -88,3 +88,8 @@ InstCombine's memcpy/memmove/memset scalarization must preserve lengths in targe
 addressable units and zero-extend memset's i8 fill per unit. Keep semantic byte
 operations (such as bswap) unchanged. The memory-pipeline executable runs real
 GVN and InstCombine→GVN passes; it does not certify the complete O2 pipeline.
+
+Memset-pattern value tracking returns an i8 operand even for native layouts.
+Only repeated units representable by zero-extending i8 may become memset.
+Keep padded arrays separate from bit-packed vectors; preserve the real
+MemCpyOpt→InstCombine→GVN regression and MemorySSA verification.

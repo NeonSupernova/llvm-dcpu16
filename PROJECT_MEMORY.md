@@ -395,3 +395,37 @@ builds. Do not claim native codegen or a full O2 pipeline from these cases.
 Native --byte-size=16 remains disabled pending the remaining optimizer,
 SelectionDAG/frame/emitter and object/runtime validation. Remote verification
 of the combined continuation is pending.
+
+## Value-tracking/MemCpyOpt continuation (2026-11-06)
+
+Six-patch implementation 9dc5c0e7f8ccf59080dd496dcca079ebbaba20a0 passed the
+combined Ubuntu experimental source-bootstrap run:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42242774505
+Ordinary Ubuntu backend O0/O2 CI passed:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42242774671
+That workflow's macOS job was cancelled before execution. The earlier SROA-only
+experimental run 42241042172 was deliberately superseded/cancelled.
+
+Patch 7 updates ValueTracking.cpp and its public API documentation. Real
+MemCpyOpt probing showed copies of native i16 0xffff globals becoming an i8 -1
+memset, which means 0x00ff per native unit. isBytewiseValue now checks a repeated
+native-unit pattern and that its high bits fit zero-extended i8. Padded i8 values
+remain eligible. Nonzero packed vectors whose elements have sub-unit padding
+are conservatively declined; arrays retain independent padded elements.
+Semantic integer widths and octet behavior stay intact.
+
+bytewise-memory.cpp adds 244 API and real MemCpyOpt→InstCombine→GVN checks:
+both unit sizes/endiannesses, scalar widths through i128, partial i24, padded
+arrays/packed vectors, undef, unknown values, pointer patterns and global copies
+with representable/unrepresentable fills. MemorySSA and IR verify; scalar
+returns preserve every source word bit. Full script passes six groups:
+86+10+128+121+216+244 = 805 checks. Fresh seven-patch apply/exact repeat pass.
+Clang and GCC16 no-PCH source syntax checks and GCC16 test syntax check passed.
+Staging/source/build paths remain as above; exploratory MemCpyOpt probe lives
+at /private/tmp/dcpu-memcpyopt-probe. The ordinary SDK is untouched.
+
+Seven-patch remote verification is pending. This is targeted memory optimizer
+coverage, not the complete O2 pipeline or native DCPU execution. Continue with
+remaining optimizer and SelectionDAG/frame/emitter/object/runtime validation;
+--byte-size=16 must remain disabled until native optimized binary execution
+and mixed-ABI rejection pass.

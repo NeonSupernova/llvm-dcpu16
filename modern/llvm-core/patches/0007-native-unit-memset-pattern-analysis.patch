@@ -1,0 +1,71 @@
+--- a/llvm/include/llvm/Analysis/ValueTracking.h
++++ b/llvm/include/llvm/Analysis/ValueTracking.h
+@@ -352,10 +352,14 @@
+ 
+ /// If the specified value can be set by repeating the same byte in memory,
+ /// return the i8 value that it is represented with. This is true for all i8
+-/// values obviously, but is also true for i32 0, i32 -1, i16 0xF0F0, double
+-/// 0.0 etc. If the value can't be handled with a repeated byte store (e.g.
+-/// i16 0x1234), return null. If the value is entirely undef and padding,
+-/// return undef.
++/// values. For octet layouts this also includes i32 0, i32 -1, i16 0xF0F0,
++/// double 0.0 etc. If the value can't be handled with a repeated byte store
++/// (e.g. i16 0x1234), return null. If the value is entirely undef and padding,
++/// return undef. With non-octet addressable units, the result is still an i8
++/// memset operand, zero-extended into every unit. A native word 0xffff is not
++/// representable this way; i16 0x00ff is. Padded i8 values remain eligible,
++/// while nonzero bit-packed vector patterns with sub-unit elements are
++/// declined.
+ LLVM_ABI Value *isBytewiseValue(Value *V, const DataLayout &DL);
+ 
+ /// Given an aggregate and an sequence of indices, see if the scalar value
+--- a/llvm/lib/Analysis/ValueTracking.cpp
++++ b/llvm/lib/Analysis/ValueTracking.cpp
+@@ -6501,7 +6501,8 @@
+ 
+ Value *llvm::isBytewiseValue(Value *V, const DataLayout &DL) {
+ 
+-  // All byte-wide stores are splatable, even of arbitrary variables.
++  // i8 stores are splattable, even with wider addressable-unit padding: a
++  // zero-extended fill preserves the value and may choose padding bits as zero.
+   if (V->getType()->isIntegerTy(8))
+     return V;
+ 
+@@ -6531,6 +6532,15 @@
+   if (C->isNullValue())
+     return Constant::getNullValue(Type::getInt8Ty(Ctx));
+ 
++  // Bit-packed vector elements that are not whole target units cannot be
++  // analyzed as independent memory cells (unlike array elements).
++  // Conservatively decline nonzero patterns here rather than turning <i8 -1, i8
++  // -1> into 0x00ff.
++  if (DL.getBitsPerByte() != 8)
++    if (auto *VTy = dyn_cast<VectorType>(C->getType()))
++      if (!DL.typeSizeEqualsStoreSize(VTy->getElementType()))
++        return nullptr;
++
+   // Constant floating-point values can be handled as integer values if the
+   // corresponding integer value is "byteable".  An important case is 0.0.
+   if (ConstantFP *CFP = dyn_cast<ConstantFP>(C)) {
+@@ -6543,12 +6553,17 @@
+     return nullptr;
+   }
+ 
+-  // We can handle constant integers that are multiple of 8 bits.
++  // A memset fill is still i8: every complete addressable unit must have the
++  // same value, and that value must be representable by zero-extending i8.
+   if (ConstantInt *CI = dyn_cast<ConstantInt>(C)) {
+-    if (CI->getBitWidth() % 8 == 0) {
+-      if (!CI->getValue().isSplat(8))
++    unsigned UnitBits = DL.getBitsPerByte();
++    if (CI->getBitWidth() % UnitBits == 0) {
++      if (!CI->getValue().isSplat(UnitBits))
+         return nullptr;
+-      return ConstantInt::get(Ctx, CI->getValue().trunc(8));
++      APInt Unit = CI->getValue().trunc(UnitBits);
++      if (Unit.getActiveBits() > 8)
++        return nullptr;
++      return ConstantInt::get(Ctx, Unit.zextOrTrunc(8));
+     }
+   }
+ 

@@ -34,3 +34,8 @@ target_include_directories(dcpu16-memory-pipeline SYSTEM PRIVATE ${LLVM_INCLUDE_
 target_compile_options(dcpu16-memory-pipeline PRIVATE ${LLVM_DEFINITIONS_LIST} -fno-rtti)
 target_link_libraries(dcpu16-memory-pipeline PRIVATE LLVMInstCombine LLVMScalarOpts LLVMAsmParser LLVMAnalysis LLVMCore)
 add_test(NAME dcpu16-memory-pipeline COMMAND dcpu16-memory-pipeline)
+add_executable(dcpu16-bytewise-memory bytewise-memory.cpp)
+target_include_directories(dcpu16-bytewise-memory SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+target_compile_options(dcpu16-bytewise-memory PRIVATE ${LLVM_DEFINITIONS_LIST} -fno-rtti)
+target_link_libraries(dcpu16-bytewise-memory PRIVATE LLVMInstCombine LLVMScalarOpts LLVMAsmParser LLVMAnalysis LLVMCore)
+add_test(NAME dcpu16-bytewise-memory COMMAND dcpu16-bytewise-memory)

@@ -197,3 +197,20 @@ patterns now use the module's addressable unit without changing i8 semantics.
 both endiannesses, copies/moves/fills through i128, alias boundaries and negative
 outside-write forwarding. Total core coverage is 561 checks in five groups.
 The complete default O2 pipeline and native machine-code path remain open.
+
+## Memset-pattern analysis progress (2026-11-06)
+
+The seventh core patch fixes value tracking used by MemCpyOpt: copying native
+0xffff words must not become an i8 0xff memset, which writes 0x00ff per unit.
+The representability test now checks complete native units and retains the i8
+operand contract. Packed sub-unit vector patterns are conservatively declined.
+244 analysis and MemCpyOpt→InstCombine→GVN checks pass locally, including
+MemorySSA/IR verification and scalar results in both unit sizes/endiannesses.
+The full suite passes 805 checks in six groups. Native code generation and the
+full O2 pipeline remain pending.
+
+The preceding combined six-patch implementation 9dc5c0e7f8ccf59080dd496dcca079ebbaba20a0
+passed Ubuntu core source-bootstrap CI:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42242774505
+Its ordinary backend Ubuntu O0/O2 job passed as well (macOS job cancelled before
+execution): https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42242774671

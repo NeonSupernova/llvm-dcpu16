@@ -1,6 +1,6 @@
 {
   "llvm_version": "23.1.4",
-  "stage": "layout-sroa-and-memory-pipelines",
+  "stage": "native-unit-scalar-memory-optimizers",
   "patches": [
     {
       "file": "patches/0001-module-local-addressable-units.patch",
@@ -25,6 +25,10 @@
     {
       "file": "patches/0006-native-unit-instcombine-memory.patch",
       "sha256": "e6dae518ea03773ac4bd45865dd1578b3b91545495207a776f7f546af99a928e"
+    },
+    {
+      "file": "patches/0007-native-unit-memset-pattern-analysis.patch",
+      "sha256": "5c7007cec631019dd65d71dc438d44416963d8ff8dc6fd9dd117004316d38535"
     }
   ],
   "files": {
@@ -55,6 +59,14 @@
     "llvm/lib/Transforms/InstCombine/InstCombineCalls.cpp": {
       "original_sha256": "6f8a9415dbde4400573b7236cd685c370eac387e3d8298484c583de905f25b96",
       "patched_sha256": "040e7d0bcff15a6ee6270b60f159b7a4ac9fccb9545fa5b197ffae57d479f124"
+    },
+    "llvm/include/llvm/Analysis/ValueTracking.h": {
+      "original_sha256": "f10e77f9801db08cd66f881f3bb76e84dd1feac02e7192105eba627474bb5939",
+      "patched_sha256": "ce2aafebfe87bacdd3e6b082b3209ce55798349c324d62f53a19510eae216e86"
+    },
+    "llvm/lib/Analysis/ValueTracking.cpp": {
+      "original_sha256": "30f10ffa118a63a512ae33633c92c946c0ff94c1dc23da2fca7feb3520d6ce19",
+      "patched_sha256": "d125fa07ff3ff1a06814b108324dab14a7ad12396e14b8c02b911881cb0ae1bd"
     }
   }
 }

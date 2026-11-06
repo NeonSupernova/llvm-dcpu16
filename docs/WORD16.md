@@ -99,7 +99,8 @@ on macOS.
 | SROA slice sizes, scalar extraction/insertion, fallback storage and memset splats | Patched; 121 pass-level scalar-return cases, both unit sizes and endiannesses |
 | SROA complex CFG/debug metadata and broader bit-packed vector cases | Further validation pending |
 | InstCombine intrinsic sizes/fills and GVN memory forwarding | 216 real-pass cases, including InstCombine→GVN sequences |
-| Full O2 pipeline, additional GVN/InstCombine transforms, value tracking and other memory optimizations | Audit/port pending |
+| Memset-pattern value tracking and MemCpyOpt→InstCombine→GVN | 244 API/integration checks; unrepresentable native fills declined |
+| Full O2 pipeline, additional GVN/InstCombine transforms and other memory optimizations | Audit/port pending |
 | Non-atomic scalar memcpy/memmove/memset expansion | Full native-unit accesses and i8 zero-extended fill tested at IR level |
 | Target-widened/atomic/pattern memory intrinsics and native C full-word fill | Pending |
 | SelectionDAG value storage, split memory operations and offsets | Pending |
@@ -139,3 +140,16 @@ It covers both unit sizes and endiannesses, copy/move/fill, alias boundaries and
 reads outside a write. The suite now has 561 checks in five CTest groups. This
 is targeted pass integration coverage, not a complete O2 pipeline or native
 machine-code support claim.
+
+The seventh patch corrects memset-pattern analysis used by MemCpyOpt. In a native
+layout, i16 0xffff cannot be represented by an i8 memset operand: i8 0xff fills
+each unit with 0x00ff. i16 0x00ff is representable. Before this fix, MemCpyOpt
+rewrote a copy of full 0xffff words into the lossy fill. Padded i8 array elements
+remain eligible; nonzero packed vectors with sub-unit elements are conservatively
+declined because their bits do not occupy independent padded memory cells.
+
+The new executable checks the analysis API and real
+MemCpyOpt→InstCombine→GVN sequences, including MemorySSA/IR verification and
+scalar results. Its 244 checks bring the suite to 805 across six CTest groups
+(five C++ executables plus interpreter loop tests). These targeted checks do
+not certify the full O2 pipeline or enable native code generation.
