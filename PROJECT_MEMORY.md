@@ -273,3 +273,26 @@ Appended core patches 3/4; original/patched hashes updated in series.json.
 Remote verification of this continuation is pending. Native --byte-size=16 is
 still disabled. Next: SROA and the full GVN/InstCombine/value-tracking audit,
 followed by SelectionDAG/frame/emitter and native object/runtime execution.
+
+SROA follow-up audit: a real SROAPass run on the native i32 store 0x11223344 /
+GEP i16 offset 1 / load i16 must preserve 0x1122. Current SROA creates an i8
+alloca/store of 0x33 and reloads i16. Preserved input:
+modern/llvm-core/probes/sroa-native.ll. Local executable probe source/build:
+/private/tmp/dcpu-sroa-probe. Its FunctionAnalysisManager registers
+PassInstrumentationAnalysis, DominatorTreeAnalysis, AssumptionAnalysis, and
+TargetIRAnalysis before invoking SROAPass(SROAOptions()). This confirms the next
+optimizer blocker; it is not included as a passing CTest. LLVMScalarOpts was
+built locally for this audit but is not required by the checked-in positive
+core tests. The first audit must cover SROA's fixed-eight-bit slice sizes,
+extraction/insertion shifts, narrow allocas and memset splats.
+
+Continuation CI at ac62a26c reached a genuine portability failure in patch 4:
+LowerMemIntrinsics accessed Memset->getModule()->getDataLayout without including
+the complete Module declaration. Clang's local PCH masked it; Ubuntu GCC caught
+it. Replaced the access with getFunction()->getDataLayout, matching existing
+helpers in that file, and updated patch/source checksums. A Clang no-PCH syntax
+check reproduced the original error and passed after the fix. GCC 16 no-PCH
+syntax checks passed for both modified utility sources and both C++ test files.
+The full local script's three groups pass again. Corrected remote CI is pending.
+The scoped patch-file whitespace attribute also permits valid blank context
+lines at the end of unified diffs; ordinary source whitespace checks stay on.

@@ -109,3 +109,10 @@ Do not enable the native flag merely because layout tests pass. Acceptance needs
 optimized frontend/IR-to-binary execution, pointer and memory tests, independently
 linked runtime objects, and mixed-ABI rejection. The existing octet16 suite must
 continue to pass against unpatched LLVM 22 and 23.
+
+A concrete remaining SROA failure is preserved in
+`modern/llvm-core/probes/sroa-native.ll`. Running the current SROA pass on its
+native i32 store/second-word i16 load produces an i8 store of 0x33 followed by
+an i16 load, instead of preserving the required value 0x1122. This was reproduced
+with the patched core and standard SROAPass analyses. The fixture is a known
+failing audit input, not a passing test or native-codegen support claim.

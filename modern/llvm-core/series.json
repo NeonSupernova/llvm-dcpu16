@@ -16,7 +16,7 @@
     },
     {
       "file": "patches/0004-native-unit-memory-loops.patch",
-      "sha256": "5de474067c36c194d05f565611658e67ec549a9c19ee4f5b963126d9326541eb"
+      "sha256": "d4354eb829b181da19935976b89d427aff4f82f623618d9ad13f13bb4739daca"
     }
   ],
   "files": {
@@ -38,7 +38,7 @@
     },
     "llvm/lib/Transforms/Utils/LowerMemIntrinsics.cpp": {
       "original_sha256": "29543f1ff6bb8fc4e6befa74896d24f9eb608dbdec0077dc0d6ac2cc96a35884",
-      "patched_sha256": "50fe81016f2c9960a77f45df14024c68f67345e60971dc0be54acdcb0031f348"
+      "patched_sha256": "804a6f2349e7e3b8d2ea8e03e696265c2645cc296f79ec1ea568d090a6967585"
     }
   }
 }

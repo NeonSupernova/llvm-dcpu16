@@ -342,7 +342,7 @@
  void llvm::expandMemSetAsLoop(MemSetInst *Memset,
                                const TargetTransformInfo *TTI) {
    auto AverageTripCount = getAverageMemOpLoopTripCount(*Memset);
-+  const DataLayout &DL = Memset->getModule()->getDataLayout();
++  const DataLayout &DL = Memset->getFunction()->getDataLayout();
 +  Value *SetValue = Memset->getValue();
 +  if (DL.getBitsPerByte() != 8) {
 +    // llvm.memset retains its i8 operand: fill each native unit with that value
