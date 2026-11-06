@@ -1,0 +1,372 @@
+--- a/llvm/lib/Transforms/Utils/LowerMemIntrinsics.cpp
++++ b/llvm/lib/Transforms/Utils/LowerMemIntrinsics.cpp
+@@ -413,10 +413,15 @@
+   Type *TypeOfCopyLen = CopyLen->getType();
+   Type *LoopOpType = TTI.getMemcpyLoopLoweringType(
+       Ctx, CopyLen, SrcAS, DstAS, SrcAlign, DstAlign, AtomicElementSize);
++  // Non-octet fallback accesses must preserve the entire addressable unit.
++  // Target-selected widened loops require a separate non-octet audit.
++  if (DL.getBitsPerByte() != 8)
++    LoopOpType = IntegerType::get(
++        Ctx, DL.getBitsPerByte() * AtomicElementSize.value_or(1));
+   assert((!AtomicElementSize || !LoopOpType->isVectorTy()) &&
+          "Atomic memcpy lowering is not supported for vector operand type");
+ 
+-  Type *Int8Type = Type::getInt8Ty(Ctx);
++  Type *UnitType = IntegerType::get(Ctx, DL.getBitsPerByte());
+   TypeSize LoopOpSize = DL.getTypeStoreSize(LoopOpType);
+   assert(LoopOpSize.isFixed() && "LoopOpType cannot be a scalable vector type");
+   assert((!AtomicElementSize || LoopOpSize % *AtomicElementSize == 0) &&
+@@ -443,7 +448,7 @@
+     // we would miss bytes if TypeStoreSize != TypeAllocSize. Therefore, use
+     // byte offsets computed from the TypeStoreSize.
+     Value *SrcGEP =
+-        MainLoopBuilder.CreateInBoundsGEP(Int8Type, SrcAddr, LEI.MainLoopIndex);
++        MainLoopBuilder.CreateInBoundsGEP(UnitType, SrcAddr, LEI.MainLoopIndex);
+     LoadInst *Load = MainLoopBuilder.CreateAlignedLoad(
+         LoopOpType, SrcGEP, PartSrcAlign, SrcIsVolatile);
+     if (!CanOverlap) {
+@@ -452,7 +457,7 @@
+                         MDNode::get(Ctx, NewScope));
+     }
+     Value *DstGEP =
+-        MainLoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr, LEI.MainLoopIndex);
++        MainLoopBuilder.CreateInBoundsGEP(UnitType, DstAddr, LEI.MainLoopIndex);
+     StoreInst *Store = MainLoopBuilder.CreateAlignedStore(
+         Load, DstGEP, PartDstAlign, DstIsVolatile);
+     if (!CanOverlap) {
+@@ -488,7 +493,7 @@
+            "Atomic memcpy lowering is not supported for selected operand size");
+ 
+     Value *SrcGEP = RBuilder.CreateInBoundsGEP(
+-        Int8Type, SrcAddr, ConstantInt::get(TypeOfCopyLen, BytesCopied));
++        UnitType, SrcAddr, ConstantInt::get(TypeOfCopyLen, BytesCopied));
+     LoadInst *Load =
+         RBuilder.CreateAlignedLoad(OpTy, SrcGEP, PartSrcAlign, SrcIsVolatile);
+     if (!CanOverlap) {
+@@ -497,7 +502,7 @@
+                         MDNode::get(Ctx, NewScope));
+     }
+     Value *DstGEP = RBuilder.CreateInBoundsGEP(
+-        Int8Type, DstAddr, ConstantInt::get(TypeOfCopyLen, BytesCopied));
++        UnitType, DstAddr, ConstantInt::get(TypeOfCopyLen, BytesCopied));
+     StoreInst *Store =
+         RBuilder.CreateAlignedStore(Load, DstGEP, PartDstAlign, DstIsVolatile);
+     if (!CanOverlap) {
+@@ -534,17 +539,22 @@
+ 
+   Type *LoopOpType = TTI.getMemcpyLoopLoweringType(
+       Ctx, CopyLen, SrcAS, DstAS, SrcAlign, DstAlign, AtomicElementSize);
++  // Non-octet fallback accesses must preserve the entire addressable unit.
++  // Target-selected widened loops require a separate non-octet audit.
++  if (DL.getBitsPerByte() != 8)
++    LoopOpType = IntegerType::get(
++        Ctx, DL.getBitsPerByte() * AtomicElementSize.value_or(1));
+   assert((!AtomicElementSize || !LoopOpType->isVectorTy()) &&
+          "Atomic memcpy lowering is not supported for vector operand type");
+   TypeSize LoopOpSize = DL.getTypeStoreSize(LoopOpType);
+   assert((!AtomicElementSize || LoopOpSize % *AtomicElementSize == 0) &&
+          "Atomic memcpy lowering is not supported for selected operand size");
+ 
+-  Type *Int8Type = Type::getInt8Ty(Ctx);
++  Type *UnitType = IntegerType::get(Ctx, DL.getBitsPerByte());
+ 
+   Type *ResidualLoopOpType = AtomicElementSize
+-                                 ? Type::getIntNTy(Ctx, *AtomicElementSize * 8)
+-                                 : Int8Type;
++                                 ? Type::getIntNTy(Ctx, *AtomicElementSize * DL.getBitsPerByte())
++                                 : UnitType;
+   TypeSize ResidualLoopOpSize = DL.getTypeStoreSize(ResidualLoopOpType);
+   assert(ResidualLoopOpSize == (AtomicElementSize ? *AtomicElementSize : 1) &&
+          "Store size is expected to match type size");
+@@ -565,7 +575,7 @@
+   // we would miss bytes if TypeStoreSize != TypeAllocSize. Therefore, use byte
+   // offsets computed from the TypeStoreSize.
+   Value *SrcGEP =
+-      MainLoopBuilder.CreateInBoundsGEP(Int8Type, SrcAddr, LEI.MainLoopIndex);
++      MainLoopBuilder.CreateInBoundsGEP(UnitType, SrcAddr, LEI.MainLoopIndex);
+   LoadInst *Load = MainLoopBuilder.CreateAlignedLoad(
+       LoopOpType, SrcGEP, PartSrcAlign, SrcIsVolatile);
+   if (!CanOverlap) {
+@@ -573,7 +583,7 @@
+     Load->setMetadata(LLVMContext::MD_alias_scope, MDNode::get(Ctx, NewScope));
+   }
+   Value *DstGEP =
+-      MainLoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr, LEI.MainLoopIndex);
++      MainLoopBuilder.CreateInBoundsGEP(UnitType, DstAddr, LEI.MainLoopIndex);
+   StoreInst *Store = MainLoopBuilder.CreateAlignedStore(
+       Load, DstGEP, PartDstAlign, DstIsVolatile);
+   if (!CanOverlap) {
+@@ -593,7 +603,7 @@
+   Align ResDstAlign(commonAlignment(PartDstAlign, ResidualLoopOpSize));
+ 
+   IRBuilder<> ResLoopBuilder(LEI.ResidualLoopIP);
+-  Value *ResSrcGEP = ResLoopBuilder.CreateInBoundsGEP(Int8Type, SrcAddr,
++  Value *ResSrcGEP = ResLoopBuilder.CreateInBoundsGEP(UnitType, SrcAddr,
+                                                       LEI.ResidualLoopIndex);
+   LoadInst *ResLoad = ResLoopBuilder.CreateAlignedLoad(
+       ResidualLoopOpType, ResSrcGEP, ResSrcAlign, SrcIsVolatile);
+@@ -602,7 +612,7 @@
+     ResLoad->setMetadata(LLVMContext::MD_alias_scope,
+                          MDNode::get(Ctx, NewScope));
+   }
+-  Value *ResDstGEP = ResLoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr,
++  Value *ResDstGEP = ResLoopBuilder.CreateInBoundsGEP(UnitType, DstAddr,
+                                                       LEI.ResidualLoopIndex);
+   StoreInst *ResStore = ResLoopBuilder.CreateAlignedStore(
+       ResLoad, ResDstGEP, ResDstAlign, DstIsVolatile);
+@@ -682,15 +692,19 @@
+ 
+   Type *LoopOpType = TTI.getMemcpyLoopLoweringType(Ctx, CopyLen, SrcAS, DstAS,
+                                                    SrcAlign, DstAlign);
++  // Non-octet fallback accesses must preserve the entire addressable unit.
++  // Target-selected widened loops require a separate non-octet audit.
++  if (DL.getBitsPerByte() != 8)
++    LoopOpType = IntegerType::get(Ctx, DL.getBitsPerByte());
+   TypeSize LoopOpSize = DL.getTypeStoreSize(LoopOpType);
+-  Type *Int8Type = Type::getInt8Ty(Ctx);
+-  bool LoopOpIsInt8 = LoopOpType == Int8Type;
++  Type *UnitType = IntegerType::get(Ctx, DL.getBitsPerByte());
++  bool LoopOpIsInt8 = LoopOpType == UnitType;
+ 
+   // If the memory accesses are wider than one byte, residual loops with
+   // i8-accesses are required to move remaining bytes.
+   bool RequiresResidual = !LoopOpIsInt8;
+ 
+-  Type *ResidualLoopOpType = Int8Type;
++  Type *ResidualLoopOpType = UnitType;
+   TypeSize ResidualLoopOpSize = DL.getTypeStoreSize(ResidualLoopOpType);
+ 
+   // Calculate the loop trip count and remaining bytes to copy after the loop.
+@@ -796,12 +810,12 @@
+       // buffers in TypeStoreSize strides while copying TypeAllocSize bytes,
+       // i.e., we would miss bytes if TypeStoreSize != TypeAllocSize. Therefore,
+       // use byte offsets computed from the TypeStoreSize.
+-      Value *LoadGEP = ResidualLoopBuilder.CreateInBoundsGEP(Int8Type, SrcAddr,
++      Value *LoadGEP = ResidualLoopBuilder.CreateInBoundsGEP(UnitType, SrcAddr,
+                                                              ResidualIndex);
+       Value *Element = ResidualLoopBuilder.CreateAlignedLoad(
+           ResidualLoopOpType, LoadGEP, ResidualSrcAlign, SrcIsVolatile,
+           "element");
+-      Value *StoreGEP = ResidualLoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr,
++      Value *StoreGEP = ResidualLoopBuilder.CreateInBoundsGEP(UnitType, DstAddr,
+                                                               ResidualIndex);
+       ResidualLoopBuilder.CreateAlignedStore(Element, StoreGEP,
+                                              ResidualDstAlign, DstIsVolatile);
+@@ -837,11 +851,11 @@
+     Value *MainIndex =
+         MainLoopBuilder.CreateSub(MainLoopPhi, CILoopOpSize, "bwd_main_index");
+     Value *LoadGEP =
+-        MainLoopBuilder.CreateInBoundsGEP(Int8Type, SrcAddr, MainIndex);
++        MainLoopBuilder.CreateInBoundsGEP(UnitType, SrcAddr, MainIndex);
+     Value *Element = MainLoopBuilder.CreateAlignedLoad(
+         LoopOpType, LoadGEP, PartSrcAlign, SrcIsVolatile, "element");
+     Value *StoreGEP =
+-        MainLoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr, MainIndex);
++        MainLoopBuilder.CreateInBoundsGEP(UnitType, DstAddr, MainIndex);
+     MainLoopBuilder.CreateAlignedStore(Element, StoreGEP, PartDstAlign,
+                                        DstIsVolatile);
+     MainLoopBuilder.CreateCondBr(MainLoopBuilder.CreateICmpEQ(MainIndex, Zero),
+@@ -867,11 +881,11 @@
+     PHINode *MainLoopPhi =
+         MainLoopBuilder.CreatePHI(ILengthType, 0, "fwd_main_index");
+     Value *LoadGEP =
+-        MainLoopBuilder.CreateInBoundsGEP(Int8Type, SrcAddr, MainLoopPhi);
++        MainLoopBuilder.CreateInBoundsGEP(UnitType, SrcAddr, MainLoopPhi);
+     Value *Element = MainLoopBuilder.CreateAlignedLoad(
+         LoopOpType, LoadGEP, PartSrcAlign, SrcIsVolatile, "element");
+     Value *StoreGEP =
+-        MainLoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr, MainLoopPhi);
++        MainLoopBuilder.CreateInBoundsGEP(UnitType, DstAddr, MainLoopPhi);
+     MainLoopBuilder.CreateAlignedStore(Element, StoreGEP, PartDstAlign,
+                                        DstIsVolatile);
+     Value *MainIndex = MainLoopBuilder.CreateAdd(MainLoopPhi, CILoopOpSize);
+@@ -910,12 +924,12 @@
+       ResidualLoopBuilder.SetCurrentDebugLocation(DbgLoc);
+       PHINode *ResidualLoopPhi =
+           ResidualLoopBuilder.CreatePHI(ILengthType, 0, "fwd_residual_index");
+-      Value *LoadGEP = ResidualLoopBuilder.CreateInBoundsGEP(Int8Type, SrcAddr,
++      Value *LoadGEP = ResidualLoopBuilder.CreateInBoundsGEP(UnitType, SrcAddr,
+                                                              ResidualLoopPhi);
+       Value *Element = ResidualLoopBuilder.CreateAlignedLoad(
+           ResidualLoopOpType, LoadGEP, ResidualSrcAlign, SrcIsVolatile,
+           "element");
+-      Value *StoreGEP = ResidualLoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr,
++      Value *StoreGEP = ResidualLoopBuilder.CreateInBoundsGEP(UnitType, DstAddr,
+                                                               ResidualLoopPhi);
+       ResidualLoopBuilder.CreateAlignedStore(Element, StoreGEP,
+                                              ResidualDstAlign, DstIsVolatile);
+@@ -953,9 +967,13 @@
+ 
+   Type *LoopOpType = TTI.getMemcpyLoopLoweringType(Ctx, CopyLen, SrcAS, DstAS,
+                                                    SrcAlign, DstAlign);
++  // Non-octet fallback accesses must preserve the entire addressable unit.
++  // Target-selected widened loops require a separate non-octet audit.
++  if (DL.getBitsPerByte() != 8)
++    LoopOpType = IntegerType::get(Ctx, DL.getBitsPerByte());
+   TypeSize LoopOpSize = DL.getTypeStoreSize(LoopOpType);
+   assert(LoopOpSize.isFixed() && "LoopOpType cannot be a scalable vector type");
+-  Type *Int8Type = Type::getInt8Ty(Ctx);
++  Type *UnitType = IntegerType::get(Ctx, DL.getBitsPerByte());
+ 
+   // Calculate the loop trip count and remaining bytes to copy after the loop.
+   uint64_t BytesCopiedInLoop =
+@@ -1001,11 +1019,11 @@
+     // we would miss bytes if TypeStoreSize != TypeAllocSize. Therefore, use
+     // byte offsets computed from the TypeStoreSize.
+     Value *SrcGEP = Builder.CreateInBoundsGEP(
+-        Int8Type, SrcAddr, ConstantInt::get(TypeOfCopyLen, BytesCopied));
++        UnitType, SrcAddr, ConstantInt::get(TypeOfCopyLen, BytesCopied));
+     LoadInst *Load =
+         Builder.CreateAlignedLoad(OpTy, SrcGEP, ResSrcAlign, SrcIsVolatile);
+     Value *DstGEP = Builder.CreateInBoundsGEP(
+-        Int8Type, DstAddr, ConstantInt::get(TypeOfCopyLen, BytesCopied));
++        UnitType, DstAddr, ConstantInt::get(TypeOfCopyLen, BytesCopied));
+     Builder.CreateAlignedStore(Load, DstGEP, ResDstAlign, DstIsVolatile);
+     BytesCopied += OperandSize;
+   };
+@@ -1049,10 +1067,10 @@
+     LoopBuilder.SetCurrentDebugLocation(DbgLoc);
+     PHINode *LoopPhi = LoopBuilder.CreatePHI(ILengthType, 0);
+     Value *Index = LoopBuilder.CreateSub(LoopPhi, CILoopOpSize, "bwd_index");
+-    Value *LoadGEP = LoopBuilder.CreateInBoundsGEP(Int8Type, SrcAddr, Index);
++    Value *LoadGEP = LoopBuilder.CreateInBoundsGEP(UnitType, SrcAddr, Index);
+     Value *Element = LoopBuilder.CreateAlignedLoad(
+         LoopOpType, LoadGEP, PartSrcAlign, SrcIsVolatile, "element");
+-    Value *StoreGEP = LoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr, Index);
++    Value *StoreGEP = LoopBuilder.CreateInBoundsGEP(UnitType, DstAddr, Index);
+     LoopBuilder.CreateAlignedStore(Element, StoreGEP, PartDstAlign,
+                                    DstIsVolatile);
+ 
+@@ -1082,10 +1100,10 @@
+     IRBuilder<> LoopBuilder(LoopBB->getTerminator());
+     LoopBuilder.SetCurrentDebugLocation(DbgLoc);
+     PHINode *LoopPhi = LoopBuilder.CreatePHI(ILengthType, 0, "fwd_index");
+-    Value *LoadGEP = LoopBuilder.CreateInBoundsGEP(Int8Type, SrcAddr, LoopPhi);
++    Value *LoadGEP = LoopBuilder.CreateInBoundsGEP(UnitType, SrcAddr, LoopPhi);
+     Value *Element = LoopBuilder.CreateAlignedLoad(
+         LoopOpType, LoadGEP, PartSrcAlign, SrcIsVolatile, "element");
+-    Value *StoreGEP = LoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr, LoopPhi);
++    Value *StoreGEP = LoopBuilder.CreateInBoundsGEP(UnitType, DstAddr, LoopPhi);
+     LoopBuilder.CreateAlignedStore(Element, StoreGEP, PartDstAlign,
+                                    DstIsVolatile);
+     Value *Index = LoopBuilder.CreateAdd(LoopPhi, CILoopOpSize);
+@@ -1132,7 +1150,7 @@
+     if (!SetValueType->isIntegerTy() && !SetValueType->isFloatingPointTy()) {
+       // If the type cannot be put into a vector, bitcast to iN first.
+       LLVMContext &Ctx = SetValue->getContext();
+-      Result = B.CreateBitCast(Result, Type::getIntNTy(Ctx, SetValueSize * 8),
++      Result = B.CreateBitCast(Result, Type::getIntNTy(Ctx, SetValueSize * DL.getBitsPerByte()),
+                                "setvalue.toint");
+     }
+     // Form a sufficiently large vector consisting of SetValue, repeated.
+@@ -1163,11 +1181,11 @@
+   unsigned DstAS = cast<PointerType>(DstAddr->getType())->getAddressSpace();
+ 
+   Type *TypeOfLen = Len->getType();
+-  Type *Int8Type = Type::getInt8Ty(Ctx);
+-  assert(SetValue->getType() == Int8Type && "Can only set bytes");
+-
+-  Type *LoopOpType = Int8Type;
+-  if (TTI) {
++  Type *UnitType = IntegerType::get(Ctx, DL.getBitsPerByte());
++  assert(SetValue->getType() == UnitType && "Can only set bytes");
++
++  Type *LoopOpType = UnitType;
++  if (TTI && DL.getBitsPerByte() == 8) {
+     // Use the same memory access type as for a memcpy with the same Dst and Src
+     // alignment and address space.
+     LoopOpType = TTI->getMemcpyLoopLoweringType(
+@@ -1199,7 +1217,7 @@
+     Align PartDstAlign(commonAlignment(DstAlign, LoopOpSize));
+ 
+     Value *DstGEP =
+-        MainLoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr, LEI.MainLoopIndex);
++        MainLoopBuilder.CreateInBoundsGEP(UnitType, DstAddr, LEI.MainLoopIndex);
+ 
+     MainLoopBuilder.CreateAlignedStore(SplatSetValue, DstGEP, PartDstAlign,
+                                        IsVolatile);
+@@ -1235,7 +1253,7 @@
+       SplatSetValue = createMemSetSplat(DL, RBuilder, SetValue, OpTy);
+ 
+     Value *DstGEP = RBuilder.CreateInBoundsGEP(
+-        Int8Type, DstAddr, ConstantInt::get(TypeOfLen, BytesSet));
++        UnitType, DstAddr, ConstantInt::get(TypeOfLen, BytesSet));
+     RBuilder.CreateAlignedStore(SplatSetValue, DstGEP, PartDstAlign,
+                                 IsVolatile);
+     BytesSet += OperandSize;
+@@ -1257,18 +1275,18 @@
+ 
+   unsigned DstAS = cast<PointerType>(DstAddr->getType())->getAddressSpace();
+ 
+-  Type *Int8Type = Type::getInt8Ty(Ctx);
+-  assert(SetValue->getType() == Int8Type && "Can only set bytes");
+-
+-  Type *LoopOpType = Int8Type;
+-  if (TTI) {
++  Type *UnitType = IntegerType::get(Ctx, DL.getBitsPerByte());
++  assert(SetValue->getType() == UnitType && "Can only set bytes");
++
++  Type *LoopOpType = UnitType;
++  if (TTI && DL.getBitsPerByte() == 8) {
+     LoopOpType = TTI->getMemcpyLoopLoweringType(
+         Ctx, Len, DstAS, DstAS, DstAlign, DstAlign, std::nullopt);
+   }
+   TypeSize LoopOpSize = DL.getTypeStoreSize(LoopOpType);
+   assert(LoopOpSize.isFixed() && "LoopOpType cannot be a scalable vector type");
+ 
+-  Type *ResidualLoopOpType = Int8Type;
++  Type *ResidualLoopOpType = UnitType;
+   TypeSize ResidualLoopOpSize = DL.getTypeStoreSize(ResidualLoopOpType);
+ 
+   Value *SplatSetValue = SetValue;
+@@ -1288,7 +1306,7 @@
+   Align PartDstAlign(commonAlignment(DstAlign, LoopOpSize));
+ 
+   Value *DstGEP =
+-      MainLoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr, LEI.MainLoopIndex);
++      MainLoopBuilder.CreateInBoundsGEP(UnitType, DstAddr, LEI.MainLoopIndex);
+   MainLoopBuilder.CreateAlignedStore(SplatSetValue, DstGEP, PartDstAlign,
+                                      IsVolatile);
+ 
+@@ -1300,7 +1318,7 @@
+ 
+   IRBuilder<> ResLoopBuilder(LEI.ResidualLoopIP);
+ 
+-  Value *ResDstGEP = ResLoopBuilder.CreateInBoundsGEP(Int8Type, DstAddr,
++  Value *ResDstGEP = ResLoopBuilder.CreateInBoundsGEP(UnitType, DstAddr,
+                                                       LEI.ResidualLoopIndex);
+   ResLoopBuilder.CreateAlignedStore(SetValue, ResDstGEP, ResDstAlign,
+                                     IsVolatile);
+@@ -1513,12 +1531,21 @@
+ void llvm::expandMemSetAsLoop(MemSetInst *Memset,
+                               const TargetTransformInfo *TTI) {
+   auto AverageTripCount = getAverageMemOpLoopTripCount(*Memset);
++  const DataLayout &DL = Memset->getModule()->getDataLayout();
++  Value *SetValue = Memset->getValue();
++  if (DL.getBitsPerByte() != 8) {
++    // llvm.memset retains its i8 operand: fill each native unit with that value
++    // zero-extended. This is distinct from a native C full-word memset API.
++    IRBuilder<> B(Memset);
++    SetValue = B.CreateZExt(SetValue,
++                           IntegerType::get(Memset->getContext(), DL.getBitsPerByte()));
++  }
+   if (ConstantInt *CI = dyn_cast<ConstantInt>(Memset->getLength())) {
+     createMemSetLoopKnownSize(
+         /*InsertBefore=*/Memset,
+         /*DstAddr=*/Memset->getRawDest(),
+         /*Len=*/CI,
+-        /*SetValue=*/Memset->getValue(),
++        /*SetValue=*/SetValue,
+         /*DstAlign=*/Memset->getDestAlign().valueOrOne(),
+         /*IsVolatile=*/Memset->isVolatile(),
+         /*TTI=*/TTI,
+@@ -1528,7 +1555,7 @@
+         /*InsertBefore=*/Memset,
+         /*DstAddr=*/Memset->getRawDest(),
+         /*Len=*/Memset->getLength(),
+-        /*SetValue=*/Memset->getValue(),
++        /*SetValue=*/SetValue,
+         /*DstAlign=*/Memset->getDestAlign().valueOrOne(),
+         /*IsVolatile=*/Memset->isVolatile(),
+         /*TTI=*/TTI,

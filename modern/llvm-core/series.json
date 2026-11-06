@@ -1,6 +1,6 @@
 {
   "llvm_version": "23.1.4",
-  "stage": "layout-and-constant-load-folding",
+  "stage": "layout-forwarding-and-memory-loops",
   "patches": [
     {
       "file": "patches/0001-module-local-addressable-units.patch",
@@ -9,6 +9,14 @@
     {
       "file": "patches/0002-fold-loads-in-native-addressable-units.patch",
       "sha256": "1d26d54b5ad1b86bfff4df0bdef4d491685e7e61049cd00fa54e05d7b336f722"
+    },
+    {
+      "file": "patches/0003-native-unit-value-forwarding.patch",
+      "sha256": "c1449af66299fc531ec71384d424192b6eeed14bd2c5ddac2e111dc905a189a7"
+    },
+    {
+      "file": "patches/0004-native-unit-memory-loops.patch",
+      "sha256": "5de474067c36c194d05f565611658e67ec549a9c19ee4f5b963126d9326541eb"
     }
   ],
   "files": {
@@ -23,6 +31,14 @@
     "llvm/lib/Analysis/ConstantFolding.cpp": {
       "original_sha256": "1ccdc41684210645173f9d7815254c54ecee0ca77f1756567094e1db82dd84a3",
       "patched_sha256": "169b8ba77432411810715907646b5072bb551d3d362ab6b1a8511858da8b860c"
+    },
+    "llvm/lib/Transforms/Utils/VNCoercion.cpp": {
+      "original_sha256": "5706b2207e0ecc0203a6fbadf72828b7c877390c3c12431bca323254bfe87e8b",
+      "patched_sha256": "f6a69c1b037ae74be8c867a72c75cabc5ea4b8e7d7a2d165bdfbc7a8778b1a6b"
+    },
+    "llvm/lib/Transforms/Utils/LowerMemIntrinsics.cpp": {
+      "original_sha256": "29543f1ff6bb8fc4e6befa74896d24f9eb608dbdec0077dc0d6ac2cc96a35884",
+      "patched_sha256": "50fe81016f2c9960a77f45df14024c68f67345e60971dc0be54acdcb0031f348"
     }
   }
 }

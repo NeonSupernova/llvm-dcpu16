@@ -41,11 +41,13 @@ Subword padding is not an extra integer value; optimizations must not infer its
 contents from an adjacent word. Physical emitters may choose padding bits, but
 a reinterpretation cannot assume arbitrary initialized padding is meaningful.
 
-Two contracts still need implementation before enabling the ABI:
+The following contracts apply before enabling the ABI:
 
-- LLVM memset has an i8 fill operand. Its relation to a 16-bit unit must be
-  explicit; a native C library with 16-bit char also needs a full-word fill path.
-  Do not reinterpret stock octet memset lowering as full-word C memset.
+- LLVM memset retains its i8 fill operand. The experimental scalar expansion
+  zero-extends that value into each 16-bit addressable unit: filling with 0xab
+  writes 0x00ab per word. Forwarding from memset follows the same rule. A native
+  C library with 16-bit char still needs a distinct full-word fill path; this
+  expansion must not be used as an implicit implementation of that C API.
 - Assembly `.byte`, `.ascii`, alignment, and zero-fill directives in the reference
   assembler retain their existing octet definitions. A word16 compiler must emit
   native words and convert target storage/alignment to directive units explicitly.
@@ -73,11 +75,16 @@ python3 modern/scripts/test_word_layout.py \
   --work-dir /path/to/isolated-word-build --jobs 4
 ```
 
-This builds only the required static LLVM core/analysis/IR components and an
-independent C++ test program. Tests cover integer widths and storage, alignments,
+This builds the required static LLVM components, including transformation
+utilities and the interpreter, and two independent C++ test programs. Tests cover integer widths and storage, alignments,
 struct/array layout, pointers, GEP, invalid specifications, copy/cache behavior,
 textual/bitcode round trips, endian-sensitive constant loads, subword padding,
-and independent octet/native layouts. The ordinary backend build never applies
+and independent octet/native layouts. Additional tests cover forwarding offsets,
+bounds and fill values. Scalar loops are validated as native IR, then adapted to
+host pointers and 64-bit GEP indices for LLVM interpreter execution. Full-unit
+copy, overlapping move, zero lengths, fill guards, known/dynamic lengths and
+ordinary octet behavior are checked. This tests loop semantics, not native
+backend execution or a complete optimization pipeline. The ordinary backend build never applies
 these patches. Experimental CI runs on Ubuntu; the core is also tested locally
 on macOS.
 
@@ -88,8 +95,10 @@ on macOS.
 | DataLayout sizes, alignments, struct offsets, pointer/index sizes | Patched and tested |
 | Module-local state, copies, textual/bitcode persistence | Patched and tested |
 | Constant initializer load reinterpretation | Native-unit folding tested; unsafe host-octet extraction declined |
-| SROA, GVN, InstCombine, value tracking, memory optimizations | Audit/port pending |
-| Memory intrinsic expansion and fill semantics | Pending |
+| GVN coercion utilities: offsets, bounds, extraction and memset forwarding | Patched; targeted utility checks pass |
+| SROA, whole GVN/InstCombine pipelines, value tracking, other memory optimizations | Audit/port pending |
+| Non-atomic scalar memcpy/memmove/memset expansion | Full native-unit accesses and i8 zero-extended fill tested at IR level |
+| Target-widened/atomic/pattern memory intrinsics and native C full-word fill | Pending |
 | SelectionDAG value storage, split memory operations and offsets | Pending |
 | Frame/call units, backend memory bridge and function pointers | Pending |
 | AsmPrinter constants, strings, padding, directive unit conversion | Pending |

@@ -136,3 +136,16 @@ The isolated core source-bootstrap/build/test workflow passed Ubuntu CI at
 https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42153353192
 Ordinary Ubuntu backend regressions also passed 09d47501; macOS CI was cancelled,
 with macOS coverage provided by the successful local builds.
+
+## Forwarding and memory-loop progress (2026-11-06)
+
+Two additional isolated core patches convert GVN coercion utility offsets,
+bounds, extraction and memset splats to native units, and expand scalar memory
+intrinsics using full-unit accesses. Memset's existing i8 operand is explicitly
+zero-extended into each unit; native C full-word fill remains separate.
+
+The core suite now has 224 checks in three groups, including interpreter execution
+of expanded loops with high-bit data, overlap, zero lengths and guard regions.
+Both octet and native paths pass locally. Interpreter execution uses host-adapted
+pointers/indices after native IR validation; native code generation and complete
+optimization pipelines remain pending. Read WORD16.md before enabling any mode.

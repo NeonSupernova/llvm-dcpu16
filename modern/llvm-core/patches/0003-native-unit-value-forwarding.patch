@@ -1,0 +1,136 @@
+--- a/llvm/lib/Transforms/Utils/VNCoercion.cpp
++++ b/llvm/lib/Transforms/Utils/VNCoercion.cpp
+@@ -46,7 +46,7 @@
+   }
+ 
+   // The store size must be byte-aligned to support future type casts.
+-  if (llvm::alignTo(MinStoreSize, 8) != MinStoreSize)
++  if (llvm::alignTo(MinStoreSize, DL.getBitsPerByte()) != MinStoreSize)
+     return false;
+ 
+   // The store has to be at least as big as the load.
+@@ -213,10 +213,13 @@
+ 
+   uint64_t LoadSize = DL.getTypeSizeInBits(LoadTy).getFixedValue();
+ 
+-  if ((WriteSizeInBits & 7) | (LoadSize & 7))
+-    return -1;
+-  uint64_t StoreSize = WriteSizeInBits / 8; // Convert to bytes.
+-  LoadSize /= 8;
++  unsigned UnitBits = DL.getBitsPerByte();
++  // A stored sub-unit integer does not initialize its padding bits. Loads may
++  // truncate a fully initialized unit, but must not forward invented padding.
++  if (WriteSizeInBits % UnitBits || (UnitBits == 8 && LoadSize % UnitBits))
++    return -1;
++  uint64_t StoreSize = WriteSizeInBits / UnitBits;
++  LoadSize = divideCeil(LoadSize, UnitBits);
+ 
+   // If the Load isn't completely contained within the stored bits, we don't
+   // have all the bits to feed it.  We could do something crazy in the future
+@@ -277,7 +280,7 @@
+   ConstantInt *SizeCst = dyn_cast<ConstantInt>(MI->getLength());
+   if (!SizeCst)
+     return -1;
+-  uint64_t MemSizeInBits = SizeCst->getZExtValue() * 8;
++  uint64_t MemSizeInBits = SizeCst->getZExtValue() * DL.getBitsPerByte();
+ 
+   // If this is memset, we just need to see if the offset is valid in the size
+   // of the memset..
+@@ -349,9 +352,9 @@
+     return SrcVal;
+   }
+ 
+-  uint64_t StoreSize =
+-      (DL.getTypeSizeInBits(SrcVal->getType()).getFixedValue() + 7) / 8;
+-  uint64_t LoadSize = (DL.getTypeSizeInBits(LoadTy).getFixedValue() + 7) / 8;
++  unsigned UnitBits = DL.getBitsPerByte();
++  uint64_t StoreSize = DL.getTypeStoreSize(SrcVal->getType()).getFixedValue();
++  uint64_t LoadSize = DL.getTypeStoreSize(LoadTy).getFixedValue();
+   // Compute which bits of the stored value are being used by the load.  Convert
+   // to an integer type to start with.
+   if (SrcVal->getType()->isPtrOrPtrVectorTy())
+@@ -359,21 +362,21 @@
+         Builder.CreatePtrToInt(SrcVal, DL.getIntPtrType(SrcVal->getType()));
+   if (!SrcVal->getType()->isIntegerTy())
+     SrcVal =
+-        Builder.CreateBitCast(SrcVal, IntegerType::get(Ctx, StoreSize * 8));
++        Builder.CreateBitCast(SrcVal, IntegerType::get(Ctx, StoreSize * UnitBits));
+ 
+   // Shift the bits to the least significant depending on endianness.
+   unsigned ShiftAmt;
+   if (DL.isLittleEndian())
+-    ShiftAmt = Offset * 8;
++    ShiftAmt = Offset * UnitBits;
+   else
+-    ShiftAmt = (StoreSize - LoadSize - Offset) * 8;
++    ShiftAmt = (StoreSize - LoadSize - Offset) * UnitBits;
+   if (ShiftAmt)
+     SrcVal = Builder.CreateLShr(SrcVal,
+                                 ConstantInt::get(SrcVal->getType(), ShiftAmt));
+ 
+   if (LoadSize != StoreSize)
+     SrcVal = Builder.CreateTruncOrBitCast(SrcVal,
+-                                          IntegerType::get(Ctx, LoadSize * 8));
++                                          IntegerType::get(Ctx, LoadSize * UnitBits));
+   return SrcVal;
+ }
+ 
+@@ -416,7 +419,8 @@
+                                           Instruction *InsertPt,
+                                           const DataLayout &DL) {
+   LLVMContext &Ctx = LoadTy->getContext();
+-  uint64_t LoadSize = DL.getTypeSizeInBits(LoadTy).getFixedValue() / 8;
++  unsigned UnitBits = DL.getBitsPerByte();
++  uint64_t LoadSize = DL.getTypeStoreSize(LoadTy).getFixedValue();
+   IRBuilder<> Builder(InsertPt);
+ 
+   // We know that this method is only called when the mem transfer fully
+@@ -425,9 +429,9 @@
+     // memset(P, 'x', 1234) -> splat('x'), even if x is a variable, and
+     // independently of what the offset is.
+     Value *Val = MSI->getValue();
+-    if (LoadSize != 1)
++    if (LoadSize != 1 || UnitBits != 8)
+       Val =
+-          Builder.CreateZExtOrBitCast(Val, IntegerType::get(Ctx, LoadSize * 8));
++          Builder.CreateZExtOrBitCast(Val, IntegerType::get(Ctx, LoadSize * UnitBits));
+     Value *OneElt = Val;
+ 
+     // Splat the value out to the right number of bits.
+@@ -435,7 +439,7 @@
+       // If we can double the number of bytes set, do it.
+       if (NumBytesSet * 2 <= LoadSize) {
+         Value *ShVal = Builder.CreateShl(
+-            Val, ConstantInt::get(Val->getType(), NumBytesSet * 8));
++            Val, ConstantInt::get(Val->getType(), NumBytesSet * UnitBits));
+         Val = Builder.CreateOr(Val, ShVal);
+         NumBytesSet <<= 1;
+         continue;
+@@ -443,7 +447,7 @@
+ 
+       // Otherwise insert one byte at a time.
+       Value *ShVal =
+-          Builder.CreateShl(Val, ConstantInt::get(Val->getType(), 1 * 8));
++          Builder.CreateShl(Val, ConstantInt::get(Val->getType(), UnitBits));
+       Val = Builder.CreateOr(OneElt, ShVal);
+       ++NumBytesSet;
+     }
+@@ -465,7 +469,8 @@
+                                                      Type *LoadTy,
+                                                      const DataLayout &DL) {
+   LLVMContext &Ctx = LoadTy->getContext();
+-  uint64_t LoadSize = DL.getTypeSizeInBits(LoadTy).getFixedValue() / 8;
++  unsigned UnitBits = DL.getBitsPerByte();
++  uint64_t LoadSize = DL.getTypeStoreSize(LoadTy).getFixedValue();
+ 
+   // We know that this method is only called when the mem transfer fully
+   // provides the bits for the load.
+@@ -474,7 +479,7 @@
+     if (!Val)
+       return nullptr;
+ 
+-    Val = ConstantInt::get(Ctx, APInt::getSplat(LoadSize * 8, Val->getValue()));
++    Val = ConstantInt::get(Ctx, APInt::getSplat(LoadSize * UnitBits, Val->getValue().zextOrTrunc(UnitBits)));
+     return ConstantFoldLoadFromConst(Val, LoadTy, DL);
+   }
+ 

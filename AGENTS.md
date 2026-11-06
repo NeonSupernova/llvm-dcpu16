@@ -63,6 +63,11 @@ and original/patched source hashes live in modern/llvm-core/series.json.
 Run modern/scripts/test_word_layout.py with an independent source/build tree;
 never replace the ordinary SDK or mix its headers with patched libraries.
 Keep core patches separate from backend changes. No global mutable byte width.
-The layout/constant-load experiment does not enable --byte-size=16. Optimizer,
+The layout/forwarding/memory-loop experiment does not enable --byte-size=16. Remaining optimizer,
 SelectionDAG, assembly, memory-intrinsic and object/runtime work remain pending.
 Execution compilations and the built runtime now use -verify-machineinstrs.
+
+Core tests execute expanded scalar loops using LLVM's interpreter after adapting
+pointers and GEP indices to its host interface. Treat this as loop-semantics
+coverage, not native DCPU execution. llvm.memset's i8 value is zero-extended per
+native unit; native C full-word fill needs a separate frontend/runtime contract.

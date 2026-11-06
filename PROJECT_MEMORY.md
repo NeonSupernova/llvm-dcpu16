@@ -242,3 +242,34 @@ tracking, memory intrinsic units/fill, SelectionDAG offsets/splits, frames/calls
 assembly constants/strings/alignment, native objects/runtime/linker and frontend
 execution all remain to port/validate. The next step is the optimizer and
 SelectionDAG audit, not enabling the command-line option on layout-only evidence.
+
+## Forwarding and memory expansion continuation (2026-11-06)
+
+Appended core patches 3/4; original/patched hashes updated in series.json.
+- VNCoercion now scales offsets and write lengths using module addressable units,
+  extracts native words correctly in either endianness, checks containment in
+  initialized storage, and splats memset's i8 value zero-extended per native unit.
+- Non-octet memcpy/memmove fallback loops use full-unit i16 loads/stores and GEPs,
+  with conservative unit-sized accesses in place of target widening. Memset loop
+  expansion zero-extends the i8 operand and writes i16 units. Octet paths retain
+  existing target preferences. Atomic/pattern/widened native operations are not
+  claimed validated; native C full-word fill remains separate.
+- Before patches, new tests failed on native offset-one forwarding and on i8
+  accesses in native copy loops. Both regression groups now pass.
+- Validation has 3 CTest groups: 86 original layout checks, 10 coercion checks,
+  128 loop checks = 224 checks. Loops execute in the upstream LLVM interpreter
+  after native IR verification plus host pointer/GEP-index adaptation. Coverage
+  includes high word bits, overlap in both directions/self move, zero length,
+  known/dynamic sizes, fill guards, and octet/native paths. This is IR semantics
+  evidence; native machine code and complete optimizer pipelines are not tested.
+- test_word_layout.py now builds LLVMTransformUtils and LLVMInterpreter too.
+  Full script/build/test passed locally against assertion-enabled LLVM 23.1.4.
+  The fresh four-patch apply and exact repeat were checked on pristine files.
+- Staging: /private/tmp/dcpu-optimizer-work. Patched source remains
+  /private/tmp/dcpu-llvm-word-src. Build/test: /private/tmp/dcpu-word-core-validation
+  (layout-tests was reconfigured for the new staging source; its old cache was
+  moved to layout-tests-initial). Additional test build: /private/tmp/dcpu-optimizer-tests.
+
+Remote verification of this continuation is pending. Native --byte-size=16 is
+still disabled. Next: SROA and the full GVN/InstCombine/value-tracking audit,
+followed by SelectionDAG/frame/emitter and native object/runtime execution.
