@@ -131,3 +131,8 @@ GEP, structs, endian-sensitive reads and bitcode persistence. The full validatio
 script and repeat run passed locally. This is the first core stage; native
 code generation remains disabled pending the optimizer, SelectionDAG, emitter,
 object/runtime and frontend audit described in [WORD16.md](WORD16.md).
+The isolated core source-bootstrap/build/test workflow passed Ubuntu CI at
+09d47501 and d9cac4b8:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42153353192
+Ordinary Ubuntu backend regressions also passed 09d47501; macOS CI was cancelled,
+with macOS coverage provided by the successful local builds.

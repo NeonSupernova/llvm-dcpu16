@@ -224,8 +224,17 @@ patch and source checksums in series.json. Never apply it to the ordinary SDK.
   /private/tmp/dcpu-word-core-validation/{llvm-core-build,layout-tests}.
   Pristine source and ordinary SDK remain /private/tmp/llvm-project-23.1.4.src
   and /private/tmp/llvm23-dcpu-build.
-- New Ubuntu experimental workflow builds patched core from the verified archive;
-  remote verification for the core implementation is pending.
+- The Ubuntu experimental workflow passed the verified archive bootstrap, patched
+  core build and test suite at both core commit 09d475014f1e849da1259889acff0f4c610ac07b
+  and CI prerequisite improvement d9cac4b8f63e8e4c7c1c14871bf43f5a0ddd9b9b:
+  https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42152775057
+  https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42153353192
+  The latter workflow uses existing build tools when present, avoiding an
+  unnecessary package installation. Tests and core patches are unchanged.
+- Ordinary backend Ubuntu O0/O2/installation CI also passed 09d47501:
+  https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42152775033
+  Its macOS job was cancelled before execution. Local macOS validation is the
+  platform evidence for this milestone; do not report a remote macOS success.
 
 Read docs/WORD16.md for candidate ABI and audit matrix. This is NOT a complete
 non-octet compiler: --byte-size=16 stays rejected. SROA/GVN/InstCombine/value
