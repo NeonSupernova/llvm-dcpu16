@@ -1,0 +1,298 @@
+--- a/llvm/include/llvm/IR/DataLayout.h
++++ b/llvm/include/llvm/IR/DataLayout.h
+@@ -109,6 +109,9 @@
+   };
+ 
+ private:
++  // Experimental downstream addressable-unit extension. This is module-local;
++  // semantic integer widths and host storage bytes are never changed.
++  unsigned BitsPerByte = 8;
+   bool BigEndian = false;
+   bool VectorsAreElementAligned = false;
+ 
+@@ -214,6 +217,8 @@
+   LLVM_ABI static Expected<DataLayout> parse(StringRef LayoutString);
+ 
+   /// Layout endianness...
++  unsigned getBitsPerByte() const { return BitsPerByte; }
++
+   bool isLittleEndian() const { return !BigEndian; }
+   bool isBigEndian() const { return BigEndian; }
+ 
+@@ -540,7 +545,7 @@
+   }
+ 
+   unsigned getPointerTypeSize(Type *Ty) const {
+-    return getPointerTypeSizeInBits(Ty) / 8;
++    return divideCeil(getPointerTypeSizeInBits(Ty), BitsPerByte);
+   }
+ 
+   /// Size examples:
+@@ -578,12 +583,12 @@
+   /// For example, returns 5 for i36 and 10 for x86_fp80.
+   TypeSize getTypeStoreSize(Type *Ty) const {
+     TypeSize StoreSizeInBits = getTypeStoreSizeInBits(Ty);
+-    return {StoreSizeInBits.getKnownMinValue() / 8,
++    return {StoreSizeInBits.getKnownMinValue() / BitsPerByte,
+             StoreSizeInBits.isScalable()};
+   }
+ 
+   /// Returns the maximum number of bits that may be overwritten by
+-  /// storing the specified type; always a multiple of 8.
++  /// storing the specified type; a multiple of getBitsPerByte().
+   ///
+   /// If Ty is a scalable vector type, the scalable property will be set and
+   /// the runtime size will be a positive integer multiple of the base size.
+@@ -592,7 +597,7 @@
+   TypeSize getTypeStoreSizeInBits(Type *Ty) const {
+     TypeSize BaseSize = getTypeSizeInBits(Ty);
+     uint64_t AlignedSizeInBits =
+-        alignToPowerOf2(BaseSize.getKnownMinValue(), 8);
++        alignToPowerOf2(BaseSize.getKnownMinValue(), BitsPerByte);
+     return {AlignedSizeInBits, BaseSize.isScalable()};
+   }
+ 
+@@ -615,7 +620,7 @@
+   LLVM_ABI TypeSize getTypeAllocSize(Type *Ty) const;
+ 
+   /// Returns the offset in bits between successive objects of the
+-  /// specified type, including alignment padding; always a multiple of 8.
++  /// specified type, including padding; a multiple of getBitsPerByte().
+   ///
+   /// If Ty is a scalable vector type, the scalable property will be set and
+   /// the runtime size will be a positive integer multiple of the base size.
+@@ -623,7 +628,7 @@
+   /// This is the amount that alloca reserves for this type. For example,
+   /// returns 96 or 128 for x86_fp80, depending on alignment.
+   TypeSize getTypeAllocSizeInBits(Type *Ty) const {
+-    return 8 * getTypeAllocSize(Ty);
++    return BitsPerByte * getTypeAllocSize(Ty);
+   }
+ 
+   /// Returns the minimum ABI-required alignment for the specified type.
+@@ -743,6 +748,7 @@
+ class StructLayout final : private TrailingObjects<StructLayout, TypeSize> {
+   friend TrailingObjects;
+ 
++  unsigned BitsPerByte;
+   TypeSize StructSize;
+   Align StructAlignment;
+   unsigned IsPadded : 1;
+@@ -751,7 +757,7 @@
+ public:
+   TypeSize getSizeInBytes() const { return StructSize; }
+ 
+-  TypeSize getSizeInBits() const { return 8 * StructSize; }
++  TypeSize getSizeInBits() const { return BitsPerByte * StructSize; }
+ 
+   Align getAlignment() const { return StructAlignment; }
+ 
+@@ -777,7 +783,7 @@
+   }
+ 
+   TypeSize getElementOffsetInBits(unsigned Idx) const {
+-    return getElementOffset(Idx) * 8;
++    return getElementOffset(Idx) * BitsPerByte;
+   }
+ 
+ private:
+--- a/llvm/lib/IR/DataLayout.cpp
++++ b/llvm/lib/IR/DataLayout.cpp
+@@ -46,7 +46,7 @@
+ //===----------------------------------------------------------------------===//
+ 
+ StructLayout::StructLayout(StructType *ST, const DataLayout &DL)
+-    : StructSize(TypeSize::getFixed(0)) {
++    : BitsPerByte(DL.getBitsPerByte()), StructSize(TypeSize::getFixed(0)) {
+   assert(!ST->isOpaque() && "Cannot get layout of opaque structs");
+   IsPadded = false;
+   NumElements = ST->getNumElements();
+@@ -207,6 +207,7 @@
+   delete static_cast<StructLayoutMap *>(LayoutMap);
+   LayoutMap = nullptr;
+   StringRepresentation = Other.StringRepresentation;
++  BitsPerByte = Other.BitsPerByte;
+   BigEndian = Other.BigEndian;
+   VectorsAreElementAligned = Other.VectorsAreElementAligned;
+   AllocaAddrSpace = Other.AllocaAddrSpace;
+@@ -228,7 +229,8 @@
+ 
+ bool DataLayout::operator==(const DataLayout &Other) const {
+   // NOTE: StringRepresentation might differ, it is not canonicalized.
+-  return BigEndian == Other.BigEndian &&
++  return BitsPerByte == Other.BitsPerByte &&
++         BigEndian == Other.BigEndian &&
+          VectorsAreElementAligned == Other.VectorsAreElementAligned &&
+          AllocaAddrSpace == Other.AllocaAddrSpace &&
+          ProgramAddrSpace == Other.ProgramAddrSpace &&
+@@ -333,7 +335,7 @@
+ /// - the value is not a multiple of the byte width;
+ /// - the value converted to byte amount is not not a power of two.
+ static Error parseAlignment(StringRef Str, Align &Alignment, StringRef Name,
+-                            bool AllowZero = false) {
++                            bool AllowZero = false, unsigned ByteWidth = 8) {
+   if (Str.empty())
+     return createStringError(Name + " alignment component cannot be empty");
+ 
+@@ -348,7 +350,6 @@
+     return Error::success();
+   }
+ 
+-  constexpr unsigned ByteWidth = 8;
+   if (Value % ByteWidth || !isPowerOf2_32(Value / ByteWidth))
+     return createStringError(
+         Name + " alignment must be a power of two times the byte width");
+@@ -374,7 +375,7 @@
+ 
+   // ABI alignment.
+   Align ABIAlign;
+-  if (Error Err = parseAlignment(Components[1], ABIAlign, "ABI"))
++  if (Error Err = parseAlignment(Components[1], ABIAlign, "ABI", false, BitsPerByte))
+     return Err;
+ 
+   if (Specifier == 'i' && BitWidth == 8 && ABIAlign != 1)
+@@ -383,7 +384,7 @@
+   // Preferred alignment. Optional, defaults to the ABI alignment.
+   Align PrefAlign = ABIAlign;
+   if (Components.size() > 2)
+-    if (Error Err = parseAlignment(Components[2], PrefAlign, "preferred"))
++    if (Error Err = parseAlignment(Components[2], PrefAlign, "preferred", false, BitsPerByte))
+       return Err;
+ 
+   if (PrefAlign < ABIAlign)
+@@ -415,13 +416,13 @@
+   // ABI alignment. Required. Can be zero, meaning use one byte alignment.
+   Align ABIAlign;
+   if (Error Err =
+-          parseAlignment(Components[1], ABIAlign, "ABI", /*AllowZero=*/true))
++          parseAlignment(Components[1], ABIAlign, "ABI", /*AllowZero=*/true, BitsPerByte))
+     return Err;
+ 
+   // Preferred alignment. Optional, defaults to the ABI alignment.
+   Align PrefAlign = ABIAlign;
+   if (Components.size() > 2)
+-    if (Error Err = parseAlignment(Components[2], PrefAlign, "preferred"))
++    if (Error Err = parseAlignment(Components[2], PrefAlign, "preferred", false, BitsPerByte))
+       return Err;
+ 
+   if (PrefAlign < ABIAlign)
+@@ -494,14 +495,14 @@
+ 
+   // ABI alignment. Required, cannot be zero.
+   Align ABIAlign;
+-  if (Error Err = parseAlignment(Components[2], ABIAlign, "ABI"))
++  if (Error Err = parseAlignment(Components[2], ABIAlign, "ABI", false, BitsPerByte))
+     return Err;
+ 
+   // Preferred alignment. Optional, defaults to the ABI alignment.
+   // Cannot be zero.
+   Align PrefAlign = ABIAlign;
+   if (Components.size() > 3)
+-    if (Error Err = parseAlignment(Components[3], PrefAlign, "preferred"))
++    if (Error Err = parseAlignment(Components[3], PrefAlign, "preferred", false, BitsPerByte))
+       return Err;
+ 
+   if (PrefAlign < ABIAlign)
+@@ -570,6 +571,8 @@
+ 
+   StringRef Rest = Spec.drop_front();
+   switch (Specifier) {
++  case 'B': // Validated and applied before all other specifications.
++    break;
+   case 's':
+     // Deprecated, but ignoring here to preserve loading older textual llvm
+     // ASM file
+@@ -595,7 +598,7 @@
+     if (Rest.empty())
+       return createSpecFormatError("S<size>");
+     Align Alignment;
+-    if (Error Err = parseAlignment(Rest, Alignment, "stack natural"))
++    if (Error Err = parseAlignment(Rest, Alignment, "stack natural", false, BitsPerByte))
+       return Err;
+     StackNaturalAlign = Alignment;
+     break;
+@@ -618,7 +621,7 @@
+                                Twine(Type) + "'");
+     }
+     Align Alignment;
+-    if (Error Err = parseAlignment(Rest, Alignment, "ABI"))
++    if (Error Err = parseAlignment(Rest, Alignment, "ABI", false, BitsPerByte))
+       return Err;
+     FunctionPtrAlign = Alignment;
+     break;
+@@ -688,6 +691,39 @@
+   if (LayoutString.empty())
+     return Error::success();
+ 
++  // Determine the addressable unit before parsing bit-valued alignments.
++  // Accept exactly one explicit B8 or B16, independent of specifier order.
++  bool SeenByteWidth = false;
++  for (StringRef Spec : split(StringRepresentation, '-')) {
++    if (!Spec.starts_with("B"))
++      continue;
++    if (SeenByteWidth)
++      return createStringError("duplicate addressable byte width specification");
++    SeenByteWidth = true;
++    if (Spec != "B8" && Spec != "B16")
++      return createStringError("addressable byte width must be B8 or B16");
++    BitsPerByte = Spec == "B16" ? 16 : 8;
++  }
++  if (BitsPerByte != 8) {
++    // Default specs are declared in octets. Convert their alignments once;
++    // explicit layout alignments below remain expressed in bits.
++    auto Convert = [this](Align A) {
++      return Align(std::max(uint64_t(1), A.value() / (BitsPerByte / 8)));
++    };
++    SmallVectorImpl<PrimitiveSpec> *DefaultSpecs[] = {&IntSpecs, &FloatSpecs, &VectorSpecs};
++    for (auto *Specs : DefaultSpecs)
++      for (auto &Spec : *Specs) {
++        Spec.ABIAlign = Convert(Spec.ABIAlign);
++        Spec.PrefAlign = Convert(Spec.PrefAlign);
++      }
++    for (auto &Spec : PointerSpecs) {
++      Spec.ABIAlign = Convert(Spec.ABIAlign);
++      Spec.PrefAlign = Convert(Spec.PrefAlign);
++    }
++    StructABIAlignment = Convert(StructABIAlignment);
++    StructPrefAlignment = Convert(StructPrefAlignment);
++  }
++
+   // Split the data layout string into specifications separated by '-' and
+   // parse each specification individually, updating internal data structures.
+   SmallVector<unsigned, 8> NonIntegralAddressSpaces;
+@@ -839,7 +875,7 @@
+ }
+ 
+ unsigned DataLayout::getPointerSize(unsigned AS) const {
+-  return divideCeil(getPointerSpec(AS).BitWidth, 8);
++  return divideCeil(getPointerSpec(AS).BitWidth, BitsPerByte);
+ }
+ 
+ unsigned DataLayout::getPointerTypeSizeInBits(Type *Ty) const {
+@@ -850,7 +886,7 @@
+ }
+ 
+ unsigned DataLayout::getIndexSize(unsigned AS) const {
+-  return divideCeil(getPointerSpec(AS).IndexBitWidth, 8);
++  return divideCeil(getPointerSpec(AS).IndexBitWidth, BitsPerByte);
+ }
+ 
+ unsigned DataLayout::getIndexTypeSizeInBits(Type *Ty) const {
+@@ -917,7 +953,7 @@
+     // approximation of reality, and if the user wanted something less
+     // less conservative, they should have specified it explicitly in the data
+     // layout.
+-    return Align(PowerOf2Ceil(BitWidth / 8));
++    return Align(PowerOf2Ceil(divideCeil(BitWidth, BitsPerByte)));
+   }
+   case Type::FixedVectorTyID:
+   case Type::ScalableVectorTyID: {
+@@ -968,7 +1004,7 @@
+   }
+   case Type::IntegerTyID: {
+     unsigned BitWidth = Ty->getIntegerBitWidth();
+-    TypeSize Size = TypeSize::getFixed(divideCeil(BitWidth, 8));
++    TypeSize Size = TypeSize::getFixed(divideCeil(BitWidth, BitsPerByte));
+     Align A = getIntegerAlignment(BitWidth, /*ABI=*/true);
+     return alignTo(Size, A.value());
+   }

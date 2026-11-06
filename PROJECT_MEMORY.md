@@ -194,3 +194,42 @@ Local LLVM 23.1.4 and 22.1.8 builds pass 38 tests at each of O0/O2, including th
 optional C bridge and installed toolchain/runtime test. Staging/build paths:
 /private/tmp/dcpu-word-work and /private/tmp/dcpu-word-build{22,23}/dcpu16-build.
 The separate non-octet core port is next; --byte-size=16 remains rejected.
+
+## Native addressable-unit core experiment (2026-11-06)
+
+Verifier checkpoint 21573e44b77b27ab9382d90e11a5f124fe4f05d4 passed Ubuntu CI:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42142366658
+macOS runner jobs were cancelled before doing work in attempts 2/3; do not claim
+remote macOS verification for this checkpoint. Local LLVM 22/23 O0/O2 execution
+with strict machine verification and the optional C bridge passed on macOS.
+
+The initial core series is isolated in modern/llvm-core/patches, with version,
+patch and source checksums in series.json. Never apply it to the ordinary SDK.
+- Patch 1 adds a module-local B8/B16 DataLayout addressable unit, defaults/explicit
+  alignments, scalar/aggregate storage, struct bit offsets, pointer/index storage,
+  copying, equality and cache behavior. Integer widths stay exact. No global EVT
+  byte-size state was reintroduced from the historical fork.
+- Patch 2 fixes constant initializer load reinterpretation to assemble target
+  addressable units rather than host octets. The native i32-from-two-i16 test
+  failed before the fix. Host-octet array extraction declines native-word input.
+- Independent C++ tests pass 86 checks against an assertion-enabled LLVM 23.1.4
+  static core build. Tests exercise endian-sensitive reads, subword padding,
+  simultaneous octet/native layouts, GEP and IR/bitcode round trips.
+- test_word_layout.py validates sources and patch hashes, applies the series,
+  builds the necessary LLVM static components, and runs the tests. Fresh patch
+  application, exact-repeat handling and refusal of modified source were checked.
+  The full script build/test and its repeat both passed locally.
+- Source: /private/tmp/dcpu-llvm-word-src (APFS clone of pristine pinned source).
+  Independent initial build: /private/tmp/dcpu-llvm-word-build; script validation:
+  /private/tmp/dcpu-word-core-validation/{llvm-core-build,layout-tests}.
+  Pristine source and ordinary SDK remain /private/tmp/llvm-project-23.1.4.src
+  and /private/tmp/llvm23-dcpu-build.
+- New Ubuntu experimental workflow builds patched core from the verified archive;
+  remote verification for the core implementation is pending.
+
+Read docs/WORD16.md for candidate ABI and audit matrix. This is NOT a complete
+non-octet compiler: --byte-size=16 stays rejected. SROA/GVN/InstCombine/value
+tracking, memory intrinsic units/fill, SelectionDAG offsets/splits, frames/calls,
+assembly constants/strings/alignment, native objects/runtime/linker and frontend
+execution all remain to port/validate. The next step is the optimizer and
+SelectionDAG audit, not enabling the command-line option on layout-only evidence.

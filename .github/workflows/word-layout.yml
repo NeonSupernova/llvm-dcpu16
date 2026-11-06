@@ -1,0 +1,26 @@
+name: Experimental word layout
+on:
+  push:
+    paths: ["modern/llvm-core/**", "modern/scripts/test_word_layout.py", "modern/llvm-source.json", ".github/workflows/word-layout.yml"]
+  pull_request:
+    paths: ["modern/llvm-core/**", "modern/scripts/test_word_layout.py", "modern/llvm-source.json", ".github/workflows/word-layout.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  core-layout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
+      - uses: actions/cache@v4
+        with:
+          path: build-word-layout
+          key: dcpu16-word-layout-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modern/llvm-source.json', 'modern/llvm-core/series.json', 'modern/scripts/test_word_layout.py') }}
+      - name: Build patched LLVM core and verify module-local word layouts
+        run: python3 modern/scripts/test_word_layout.py --bootstrap --jobs 4

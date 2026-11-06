@@ -116,3 +116,18 @@ work remain open. Implementation commit
 b8acc95ce21f6c4a79935e2a33bcb882bc35f84c passed Ubuntu and macOS source-bootstrap,
 O0/O2 execution and installation CI:
 https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/41986967332
+
+## Verifier and non-octet core progress (2026-11-06)
+
+Execution compilations and the packaged runtime now run LLVM's strict machine
+verifier. Frame address selection, direct call operand descriptors, and select
+call-frame metadata are corrected. Local LLVM 22/23 O0/O2 suites pass. Ubuntu CI
+passed checkpoint 21573e44; macOS CI jobs were cancelled before doing work.
+
+A separately pinned LLVM 23.1.4 core patch series now models module-local B16
+layouts and folds constant loads using native addressable units. An independent
+core build passes 86 checks, including mixed octet/native layouts in one process,
+GEP, structs, endian-sensitive reads and bitcode persistence. The full validation
+script and repeat run passed locally. This is the first core stage; native
+code generation remains disabled pending the optimizer, SelectionDAG, emitter,
+object/runtime and frontend audit described in [WORD16.md](WORD16.md).

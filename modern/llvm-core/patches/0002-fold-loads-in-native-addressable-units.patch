@@ -1,0 +1,85 @@
+--- a/llvm/lib/Analysis/ConstantFolding.cpp
++++ b/llvm/lib/Analysis/ConstantFolding.cpp
+@@ -538,7 +538,8 @@
+ /// the CurPtr buffer. DL is the DataLayout. When IsByteLoad is true, do not
+ /// unwrap inttoptr constant expressions. The caller would reconstruct those
+ /// bits as a ConstantByte, dropping the pointer's provenance.
+-bool ReadDataFromGlobal(Constant *C, uint64_t ByteOffset, unsigned char *CurPtr,
++template <typename Unit>
++bool ReadDataFromGlobal(Constant *C, uint64_t ByteOffset, Unit *CurPtr,
+                         unsigned BytesLeft, const DataLayout &DL,
+                         bool IsByteLoad = false) {
+   assert(ByteOffset <= DL.getTypeAllocSize(C->getType()) &&
+@@ -555,16 +556,19 @@
+ 
+   auto *CI = dyn_cast<ConstantInt>(C);
+   if (CI && CI->getType()->isIntegerTy()) {
+-    if ((CI->getBitWidth() & 7) != 0)
++    unsigned UnitBits = DL.getBitsPerByte();
++    // Sub-unit padding bits are not an integer value. Decline reinterpretation
++    // through such initializers rather than reading the next memory location.
++    if (CI->getBitWidth() % UnitBits != 0)
+       return false;
+     const APInt &Val = CI->getValue();
+-    unsigned IntBytes = unsigned(CI->getBitWidth()/8);
++    unsigned IntBytes = CI->getBitWidth() / UnitBits;
+ 
+     for (unsigned i = 0; i != BytesLeft && ByteOffset != IntBytes; ++i) {
+       unsigned n = ByteOffset;
+       if (!DL.isLittleEndian())
+         n = IntBytes - n - 1;
+-      CurPtr[i] = Val.extractBits(8, n * 8).getZExtValue();
++      CurPtr[i] = Val.extractBits(UnitBits, n * UnitBits).getZExtValue();
+       ++ByteOffset;
+     }
+     return true;
+@@ -726,7 +730,8 @@
+     return nullptr;
+   }
+ 
+-  unsigned BytesLoaded = (IntType->getBitWidth() + 7) / 8;
++  unsigned UnitBits = DL.getBitsPerByte();
++  unsigned BytesLoaded = divideCeil(IntType->getBitWidth(), UnitBits);
+   // Allow folding of large type loads (e.g. <16 x double>).
+   if (BytesLoaded > 128 || BytesLoaded == 0)
+     return nullptr;
+@@ -749,8 +754,10 @@
+   if (Offset >= (int64_t)InitializerSize.getFixedValue())
+     return PoisonValue::get(IntType);
+ 
+-  SmallVector<unsigned char, 64> RawBytes(BytesLoaded);
+-  unsigned char *CurPtr = RawBytes.data();
++  // Host bytes cannot represent a native 16-bit addressable unit. Keep one
++  // uint16_t per target unit; ordinary octet layouts still use only low 8 bits.
++  SmallVector<uint16_t, 64> RawBytes(BytesLoaded);
++  uint16_t *CurPtr = RawBytes.data();
+   unsigned BytesLeft = BytesLoaded;
+ 
+   // If we're loading off the beginning of the global, some bytes may be valid.
+@@ -768,13 +775,13 @@
+   if (DL.isLittleEndian()) {
+     ResultVal = RawBytes[BytesLoaded - 1];
+     for (unsigned i = 1; i != BytesLoaded; ++i) {
+-      ResultVal <<= 8;
++      ResultVal <<= UnitBits;
+       ResultVal |= RawBytes[BytesLoaded - 1 - i];
+     }
+   } else {
+     ResultVal = RawBytes[0];
+     for (unsigned i = 1; i != BytesLoaded; ++i) {
+-      ResultVal <<= 8;
++      ResultVal <<= UnitBits;
+       ResultVal |= RawBytes[i];
+     }
+   }
+@@ -793,6 +800,10 @@
+     return nullptr;
+ 
+   const DataLayout &DL = GV->getDataLayout();
++  // This API promises an array of host octets; it cannot represent native
++  // words without truncation. Non-octet callers need a separate API.
++  if (DL.getBitsPerByte() != 8)
++    return nullptr;
+   Constant *Init = const_cast<Constant *>(GV->getInitializer());
+   TypeSize InitSize = DL.getTypeAllocSize(Init->getType());
+   if (InitSize < Offset)

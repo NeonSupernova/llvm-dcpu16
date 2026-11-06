@@ -1,0 +1,28 @@
+{
+  "llvm_version": "23.1.4",
+  "stage": "layout-and-constant-load-folding",
+  "patches": [
+    {
+      "file": "patches/0001-module-local-addressable-units.patch",
+      "sha256": "3d97e4f623741b77fc26ef823f42fc08c699e1944077710f2c4705788e553a18"
+    },
+    {
+      "file": "patches/0002-fold-loads-in-native-addressable-units.patch",
+      "sha256": "1d26d54b5ad1b86bfff4df0bdef4d491685e7e61049cd00fa54e05d7b336f722"
+    }
+  ],
+  "files": {
+    "llvm/include/llvm/IR/DataLayout.h": {
+      "original_sha256": "7bb323919d9c8b3474c2e92bd55acedda09e95c05873aee35441592b0174728c",
+      "patched_sha256": "d9f975a7d5578dc58892d5dd57ff5de8206f459cff7fba81a90e52f0bf742334"
+    },
+    "llvm/lib/IR/DataLayout.cpp": {
+      "original_sha256": "5cbc8e1fa332c9d4d68c384aae42cf157affed9bf1be35998775516e3146b38a",
+      "patched_sha256": "1afcf3951029b4b7bbe6cdd12afcdea94decd7c8dc8ce6f68e9b02660ced0e58"
+    },
+    "llvm/lib/Analysis/ConstantFolding.cpp": {
+      "original_sha256": "1ccdc41684210645173f9d7815254c54ecee0ca77f1756567094e1db82dd84a3",
+      "patched_sha256": "169b8ba77432411810715907646b5072bb551d3d362ab6b1a8511858da8b860c"
+    }
+  }
+}

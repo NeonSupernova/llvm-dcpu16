@@ -9,7 +9,8 @@ The root CMake build now selects `modern/`.
 
 This is an experimental compiler, with binary execution regression tests.
 It is not yet a complete replacement SDK for the historical word-byte ABI.
-Read [the ABI](docs/ABI.md) and [the remaining modernization work](docs/MODERNIZATION.md).
+Read [the ABI](docs/ABI.md), [the native word-layout experiment](docs/WORD16.md),
+and [the remaining modernization work](docs/MODERNIZATION.md).
 
 ## Build and test
 

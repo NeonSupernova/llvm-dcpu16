@@ -55,3 +55,14 @@ objects must be linked explicitly; CMake builds and installs dcpu16-rt.dco.
 Preserve the inherited high-word-first register returns (arguments and memory
 are low-word first). i64 returns use a hidden result pointer. Keep Select16's
 implicit EX use: without it, optimized code can reuse invalid comparisons.
+
+## Non-octet LLVM core
+
+Read docs/WORD16.md before touching the experimental core series. Patch files
+and original/patched source hashes live in modern/llvm-core/series.json.
+Run modern/scripts/test_word_layout.py with an independent source/build tree;
+never replace the ordinary SDK or mix its headers with patched libraries.
+Keep core patches separate from backend changes. No global mutable byte width.
+The layout/constant-load experiment does not enable --byte-size=16. Optimizer,
+SelectionDAG, assembly, memory-intrinsic and object/runtime work remain pending.
+Execution compilations and the built runtime now use -verify-machineinstrs.
