@@ -1,6 +1,6 @@
 {
   "llvm_version": "23.1.4",
-  "stage": "layout-forwarding-memory-and-sroa",
+  "stage": "layout-sroa-and-memory-pipelines",
   "patches": [
     {
       "file": "patches/0001-module-local-addressable-units.patch",
@@ -21,6 +21,10 @@
     {
       "file": "patches/0005-native-unit-sroa.patch",
       "sha256": "0c518fb47bdc0ef4dd52e5f949e6e53331c162be9a3fdd44851fe2d011b05069"
+    },
+    {
+      "file": "patches/0006-native-unit-instcombine-memory.patch",
+      "sha256": "e6dae518ea03773ac4bd45865dd1578b3b91545495207a776f7f546af99a928e"
     }
   ],
   "files": {
@@ -47,6 +51,10 @@
     "llvm/lib/Transforms/Scalar/SROA.cpp": {
       "original_sha256": "a6f5ed53b7808bcf24dcf16895be2670189ff04dd45a1e810c8a076a81931b1e",
       "patched_sha256": "58fac0fdb1529d8f10f4838697334d67c0cde9625096ed76a14fb6d0d357eab9"
+    },
+    "llvm/lib/Transforms/InstCombine/InstCombineCalls.cpp": {
+      "original_sha256": "6f8a9415dbde4400573b7236cd685c370eac387e3d8298484c583de905f25b96",
+      "patched_sha256": "040e7d0bcff15a6ee6270b60f159b7a4ac9fccb9545fa5b197ffae57d479f124"
     }
   }
 }

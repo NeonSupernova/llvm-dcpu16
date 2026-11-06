@@ -83,3 +83,8 @@ and padding checks while converting memory slice units; a native storage unit
 is not an integer-width override. The old SROA probe is now a required positive
 fixture. Scalar-return tests fold constant arithmetic after SROA, not a second
 unaudited memory optimization pass. Full native code generation stays disabled.
+
+InstCombine's memcpy/memmove/memset scalarization must preserve lengths in target
+addressable units and zero-extend memset's i8 fill per unit. Keep semantic byte
+operations (such as bswap) unchanged. The memory-pipeline executable runs real
+GVN and InstCombine→GVN passes; it does not certify the complete O2 pipeline.

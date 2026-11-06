@@ -185,3 +185,15 @@ writes/copies/fills, mixed and packed structs, padding, scalar/vector cases and
 the original reproducer pass locally. Fresh patch application and no-PCH
 Clang/GCC checks pass too. The full optimizer pipeline and native code generation
 remain pending; see WORD16.md for the remaining audit boundaries.
+
+## Memory pass integration progress (2026-11-06)
+
+The sixth isolated core patch fixes InstCombine intrinsic expansion that used
+fixed octet widths for native copies/fills. A real InstCombine→GVN run previously
+reduced a two-word memset to a one-word store. Length-to-bit conversion and fill
+patterns now use the module's addressable unit without changing i8 semantics.
+
+216 new GVN and InstCombine→GVN cases pass locally, including byte/word layouts,
+both endiannesses, copies/moves/fills through i128, alias boundaries and negative
+outside-write forwarding. Total core coverage is 561 checks in five groups.
+The complete default O2 pipeline and native machine-code path remain open.

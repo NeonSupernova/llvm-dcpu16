@@ -29,3 +29,8 @@ target_include_directories(dcpu16-sroa-units SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS}
 target_compile_options(dcpu16-sroa-units PRIVATE ${LLVM_DEFINITIONS_LIST} -fno-rtti)
 target_link_libraries(dcpu16-sroa-units PRIVATE LLVMScalarOpts LLVMAsmParser LLVMAnalysis LLVMCore)
 add_test(NAME dcpu16-sroa-units COMMAND dcpu16-sroa-units "${CMAKE_CURRENT_SOURCE_DIR}/../probes/sroa-native.ll")
+add_executable(dcpu16-memory-pipeline memory-pipeline.cpp)
+target_include_directories(dcpu16-memory-pipeline SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+target_compile_options(dcpu16-memory-pipeline PRIVATE ${LLVM_DEFINITIONS_LIST} -fno-rtti)
+target_link_libraries(dcpu16-memory-pipeline PRIVATE LLVMInstCombine LLVMScalarOpts LLVMAsmParser LLVMAnalysis LLVMCore)
+add_test(NAME dcpu16-memory-pipeline COMMAND dcpu16-memory-pipeline)

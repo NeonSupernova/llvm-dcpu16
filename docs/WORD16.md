@@ -76,7 +76,7 @@ python3 modern/scripts/test_word_layout.py \
 ```
 
 This builds the required static LLVM components, including transformation
-utilities and the interpreter, and three independent C++ test programs. Tests cover integer widths and storage, alignments,
+utilities and the interpreter, and four independent C++ test programs. Tests cover integer widths and storage, alignments,
 struct/array layout, pointers, GEP, invalid specifications, copy/cache behavior,
 textual/bitcode round trips, endian-sensitive constant loads, subword padding,
 and independent octet/native layouts. Additional tests cover forwarding offsets,
@@ -98,7 +98,8 @@ on macOS.
 | GVN coercion utilities: offsets, bounds, extraction and memset forwarding | Patched; targeted utility checks pass |
 | SROA slice sizes, scalar extraction/insertion, fallback storage and memset splats | Patched; 121 pass-level scalar-return cases, both unit sizes and endiannesses |
 | SROA complex CFG/debug metadata and broader bit-packed vector cases | Further validation pending |
-| Whole GVN/InstCombine pipelines, value tracking, other memory optimizations | Audit/port pending |
+| InstCombine intrinsic sizes/fills and GVN memory forwarding | 216 real-pass cases, including InstCombine→GVN sequences |
+| Full O2 pipeline, additional GVN/InstCombine transforms, value tracking and other memory optimizations | Audit/port pending |
 | Non-atomic scalar memcpy/memmove/memset expansion | Full native-unit accesses and i8 zero-extended fill tested at IR level |
 | Target-widened/atomic/pattern memory intrinsics and native C full-word fill | Pending |
 | SelectionDAG value storage, split memory operations and offsets | Pending |
@@ -125,6 +126,16 @@ and check the resulting scalar returns. Cases cover 32/64-bit extraction and
 partial writes, both endiannesses, mixed and packed structs, i8/i24 padding,
 scalar/vector reinterpretation, partial memcpy/memset, and the original fixture.
 These are targeted optimizer checks, not native machine-code execution or proof
-that the complete O2 pipeline is ready. There are 345 checks across four CTest
+that the complete O2 pipeline is ready. The SROA stage raises coverage to 345 checks across four CTest
 groups. Complex CFGs, debug metadata quality and additional bit-packed vector
 cases need further validation, along with the remaining audit areas above.
+
+The sixth patch fixes InstCombine's single-load/store memory-intrinsic expansion:
+lengths scale by the module's addressable width, and memset splats zero-extend
+the i8 fill per unit. Before this fix, a native two-word memset became a one-word
+i16 store. The new test executable runs GVN alone and InstCombine followed by
+GVN, verifies the IR and checks scalar returns (including i128 copy/fill cases).
+It covers both unit sizes and endiannesses, copy/move/fill, alias boundaries and
+reads outside a write. The suite now has 561 checks in five CTest groups. This
+is targeted pass integration coverage, not a complete O2 pipeline or native
+machine-code support claim.

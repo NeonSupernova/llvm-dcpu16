@@ -367,3 +367,31 @@ pipeline. Complex CFG/debug metadata and broader bit-packed vector cases remain
 to validate. Next audit: real GVN/InstCombine and value tracking, then SelectionDAG,
 frame/emitter, object/runtime integration and native emulator execution.
 Remote SROA continuation verification is pending.
+
+## InstCombine/GVN memory integration continuation (2026-11-06)
+
+During SROA CI, real InstCombine→GVN probing exposed another memory bug:
+InstCombine turned native memset length 2 into an i16 store (only 1 native unit),
+with an octet splat 0xabab instead of native zero-extended 0x00ab per unit.
+The GVN-alone cases passed with the previous forwarding patch; adding
+InstCombine reproduced the size loss. New patch 6 fixes the two conversions in
+InstCombineCalls.cpp: memcpy/memmove integer width and memset integer/splat width.
+The module's DataLayout supplies the addressable unit; semantic i8 remains i8.
+
+A new executable runs real legacy GVN alone and InstCombine then GVN, verifies
+IR and checks returned constants. 216 cases cover both units/endiannesses,
+1/2/4/8-unit copies, moves and fills through i128, high-bit fill values,
+forwarded word extraction, alias boundaries and an outside-write negative case.
+All five groups pass locally: 86+10+128+121+216 = 561 checks. The full script,
+fresh six-patch application and exact repeat pass. GCC16 no-PCH syntax checks
+passed for InstCombineCalls and the test source; Clang no-PCH source check passes.
+LLVMInstCombine is now an explicit build target. Staging and build paths are
+unchanged from the SROA continuation. Additional exploratory probe:
+/private/tmp/dcpu-pipeline-probe (prints the old wrong i16 store before patch 6).
+
+The combined six-patch source-bootstrap run is the remote verification target;
+any superseded SROA-only CI cancellation is deliberate to avoid duplicate LLVM
+builds. Do not claim native codegen or a full O2 pipeline from these cases.
+Native --byte-size=16 remains disabled pending the remaining optimizer,
+SelectionDAG/frame/emitter and object/runtime validation. Remote verification
+of the combined continuation is pending.
