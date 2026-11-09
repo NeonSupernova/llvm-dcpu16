@@ -76,7 +76,7 @@ python3 modern/scripts/test_word_layout.py \
 ```
 
 This builds the required static LLVM components, including transformation
-utilities and the interpreter, and five independent C++ test programs. Tests cover integer widths and storage, alignments,
+utilities and the interpreter, and six independent C++ test programs. Tests cover integer widths and storage, alignments,
 struct/array layout, pointers, GEP, invalid specifications, copy/cache behavior,
 textual/bitcode round trips, endian-sensitive constant loads, subword padding,
 and independent octet/native layouts. Additional tests cover forwarding offsets,
@@ -100,7 +100,7 @@ on macOS.
 | SROA complex CFG/debug metadata and broader bit-packed vector cases | Further validation pending |
 | InstCombine intrinsic sizes/fills and GVN memory forwarding | 216 real-pass cases, including InstCombine→GVN sequences |
 | Memset-pattern value tracking and MemCpyOpt→InstCombine→GVN | 244 API/integration checks; unrepresentable native fills declined |
-| DSE overlapping constant-store merging | Known failing native-unit reproducer; offset still scales by eight |
+| DSE overlapping stores and shortened assignment fragments | Patched; 2,036 real-pass checks with both units/endiannesses and atomic/volatile/padding guards |
 | Loop-idiom recognition and full O2 pipeline | Audit/port pending |
 | Non-atomic scalar memcpy/memmove/memset expansion | Full native-unit accesses and i8 zero-extended fill tested at IR level |
 | Target-widened/atomic/pattern memory intrinsics and native C full-word fill | Pending |
@@ -155,10 +155,10 @@ scalar results. Its 244 checks bring the suite to 805 across six CTest groups
 (five C++ executables plus interpreter loop tests). These targeted checks do
 not certify the full O2 pipeline or enable native code generation.
 
-## Next verified blocker and code-generation audit
+## DSE regression and code-generation audit
 
-A real DSEPass probe on the seven-patch core still miscompiles overlapping
-constant stores. With the native layout above:
+A real DSEPass probe on the seven-patch core miscompiled overlapping constant
+stores. This is fixed by patch 8. With the native layout above:
 
 ```llvm
 define i32 @entry(ptr %p) {
@@ -170,11 +170,23 @@ define i32 @entry(ptr %p) {
 }
 ```
 
-The expected merged value is 0xabcd3344. DSE currently emits 0x11abcd44 because
-`tryToMergePartialOverlappingStores` in `DeadStoreElimination.cpp` multiplies
-the target-unit offset by eight. Its assignment-debug shortening also assumes
-eight-bit units. This is a known remaining failure, excluded from the 805 passing
-checks; it must become a positive real-pass regression when fixed.
+The expected merged value is 0xabcd3344. Before patch 8, DSE emitted 0x11abcd44
+because `tryToMergePartialOverlappingStores` in `DeadStoreElimination.cpp`
+multiplied target-unit offsets by eight. The patch uses the module's addressable
+width there and when shortening debug assignment fragments.
+
+The DSE executable verifies input/output IR and MemorySSA, checks merged store
+constants directly, and runs real DSE→GVN scalar-return checks. It covers both
+unit sizes/endiannesses, i32/i64/i128 values with contained i16/i32 writes at every
+unit offset, negative base offsets, octet i8 writes, native i8 padding, disjoint
+writes, matching unordered atomics, and volatile/ordered-atomic guards. Shortened
+memsets are checked at both ends, including their target-unit lengths, scalar
+results and unlinked/killed debug assignment fragments. These are targeted
+fragment tests, not certification of all debug expressions or native DWARF.
+
+The suite now passes 2,841 checks in seven groups (six C++ executables plus
+interpreter loop tests). Loop idioms, the full O2 pipeline and native machine
+code generation remain pending.
 
 The code-generation audit identifies these next boundaries in pinned LLVM 23:
 

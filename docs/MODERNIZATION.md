@@ -214,3 +214,23 @@ passed Ubuntu core source-bootstrap CI:
 https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42242774505
 Its ordinary backend Ubuntu O0/O2 job passed as well (macOS job cancelled before
 execution): https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42242774671
+
+## DSE progress (2026-11-09)
+
+The seventh-patch implementation df313376acf65eb021d0aa699beee188835a6f2e
+passed clean Ubuntu core bootstrap/build/test CI:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42260119316
+Its ordinary Ubuntu O0/O2 backend job also passed; macOS CI was cancelled before
+execution: https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42260119263
+
+Patch 8 fixes native-unit bit offsets when DSE merges overlapping constants and
+shortens debug assignment fragments. The recorded second-word-write corruption
+is covered by real DSE tests, alongside 32/64/128-bit values, both units and
+endiannesses, every contained offset, negative bases, padding/disjoint guards,
+atomic/volatile access rules, and shortened fills at both ends. Input/output IR,
+MemorySSA, merged constants, scalar returns after GVN and dead debug fragments
+are checked. All 2,841 checks in seven groups pass locally, including 2,036 DSE
+checks. Full bootstrap verification of patch 8 is pending remote CI; the local
+validation used a focused no-PCH DSE rebuild because of limited disk space.
+This does not enable --byte-size=16; loop idioms and the remaining optimizer,
+SelectionDAG/frame/emitter/object/runtime paths still need validation.

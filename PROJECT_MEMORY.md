@@ -446,3 +446,49 @@ No DSE fix is claimed, and this failure is not counted in the passing suite.
 WORD16.md records reproducing IR and a concrete EVT/LLT/MMO/SelectionDAG/backend
 audit map. Fix DSE with a real pass-level regression next, then loop-idiom and
 remaining pipeline conversions before native codegen acceptance.
+
+## DSE native-unit continuation (2026-11-09)
+
+Prior seven-patch implementation df313376acf65eb021d0aa699beee188835a6f2e
+passed Ubuntu core source-bootstrap/build/test CI:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42260119316
+Ordinary Ubuntu O0/O2 backend CI passed, macOS job cancelled before execution:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42260119263
+
+Appended 0008-native-unit-dead-store-elimination.patch and hashes. Two conversions
+now use the module's getBitsPerByte(): overlapping constant-store merge offsets
+and shortened assignment fragment offsets/sizes. No semantic width or padding/
+volatile/atomic eligibility checks are changed. The pre-patch real-pass suite
+failed on a wrong merged store, and a separate shortened-memset probe showed
+a 16-bit dead debug fragment where the native layout required 32 bits.
+
+New dse-units.cpp performs 2,036 checks: real DSE with normal analyses, input/
+output IR and MemorySSA verification, direct merged constants/atomicity, and
+DSE→GVN scalar returns. Covers B8/B16, both endiannesses, widths32/64/128 with
+contained i16/i32 writes at every target-unit offset, negative bases, octet i8,
+native i8 padding, disjoint writes, matching unordered atomics and volatile/
+ordered-atomic guards. Shortened fills at both ends verify lengths, scalar
+results and killed/unlinked assignment fragments. All seven CTest groups pass:
+86+10+128+121+216+244+2036 = 2841 checks. No full O2/native codegen claim.
+
+Staging: /private/tmp/dcpu-dse-work. Tests: /private/tmp/dcpu-dse-tests.
+Old temporary source/config files had been removed by cleanup. Re-downloaded and
+verified the pinned archive, restored missing source/config/header files, and
+verified exact hashes for all patched source files in the eight-patch series. Missing unmodified
+files in source/pristine trees share hard links: replace files when editing,
+rather than mutating shared inodes. Partial test extraction hit ENOSPC; removed
+only this turn's incomplete upstream test extraction, excluded unused upstream
+tests/docs/examples/benchmarks on recovery, then removed the downloaded archive.
+With explicit approval, removed obsolete /private/tmp/dcpu-sroa-tests and
+/private/tmp/dcpu-word-core-validation/layout-tests to recover space.
+
+Because the disk remains nearly full, local validation rebuilt only DSE with
+Clang -O2/no PCH, updated its member in the existing isolated LLVMScalarOpts
+archive, then rebuilt/relinked the complete test suite. Other LLVM static
+libraries are the previously verified seven-patch build. GCC16 no-PCH syntax
+checks passed for source and final tests. Fresh eight-patch application and
+exact repeat passed. The pristine source and ordinary SDK are not patched.
+Do not claim a full local bootstrap rerun; remote clean bootstrap is pending.
+Next: loop-idiom recognition and remaining optimizer conversions, then the
+EVT/LLT/MMO/SelectionDAG/frame/emitter/object/runtime work in WORD16.md.
+Native --byte-size=16 remains deliberately disabled. Nyet is untouched.

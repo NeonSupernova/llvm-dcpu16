@@ -1,0 +1,25 @@
+--- a/llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp
++++ b/llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp
+@@ -699,9 +699,10 @@
+     adjustArgAttributes(DeadIntrinsic, 0, ToRemoveSize);
+   }
+ 
+-  // Update attached dbg.assign intrinsics. Assume 8-bit byte.
+-  shortenAssignment(DeadI, OrigDest, DeadStart * 8, DeadSize * 8, NewSize * 8,
+-                    IsOverwriteEnd);
++  // Convert target addressable-unit offsets and sizes to debug bit fragments.
++  unsigned UnitBits = DeadI->getDataLayout().getBitsPerByte();
++  shortenAssignment(DeadI, OrigDest, DeadStart * UnitBits, DeadSize * UnitBits,
++                    NewSize * UnitBits, IsOverwriteEnd);
+ 
+   // Finally update start and size of dead access.
+   if (!IsOverwriteEnd)
+@@ -813,7 +814,7 @@
+   KillingValue = KillingValue.zext(DeadValue.getBitWidth());
+ 
+   // Offset of the smaller store inside the larger store
+-  unsigned BitOffsetDiff = (KillingOffset - DeadOffset) * 8;
++  unsigned BitOffsetDiff = (KillingOffset - DeadOffset) * DL.getBitsPerByte();
+   unsigned LShiftAmount =
+       DL.isBigEndian() ? DeadValue.getBitWidth() - BitOffsetDiff - KillingBits
+                        : BitOffsetDiff;

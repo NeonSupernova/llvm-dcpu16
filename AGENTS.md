@@ -93,3 +93,8 @@ Memset-pattern value tracking returns an i8 operand even for native layouts.
 Only repeated units representable by zero-extending i8 may become memset.
 Keep padded arrays separate from bit-packed vectors; preserve the real
 MemCpyOpt→InstCombine→GVN regression and MemorySSA verification.
+
+DSE must convert target-unit offsets to bits with the module's DataLayout when
+merging constant stores or shortening assignment fragments. Preserve padding,
+volatile and atomic ordering guards. The real DSE tests verify MemorySSA, merged
+constants, downstream GVN results and killed/unlinked assignment fragments.

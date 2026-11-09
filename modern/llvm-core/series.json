@@ -29,6 +29,10 @@
     {
       "file": "patches/0007-native-unit-memset-pattern-analysis.patch",
       "sha256": "5c7007cec631019dd65d71dc438d44416963d8ff8dc6fd9dd117004316d38535"
+    },
+    {
+      "file": "patches/0008-native-unit-dead-store-elimination.patch",
+      "sha256": "c057b336bc8928f8780f27b549436bb94def5fbf1381011462576ae1c23201d7"
     }
   ],
   "files": {
@@ -67,6 +71,10 @@
     "llvm/lib/Analysis/ValueTracking.cpp": {
       "original_sha256": "30f10ffa118a63a512ae33633c92c946c0ff94c1dc23da2fca7feb3520d6ce19",
       "patched_sha256": "d125fa07ff3ff1a06814b108324dab14a7ad12396e14b8c02b911881cb0ae1bd"
+    },
+    "llvm/lib/Transforms/Scalar/DeadStoreElimination.cpp": {
+      "original_sha256": "530f19b7038c89197d055c940d3836b501457ad95a6f141eb4c433d99f6c1748",
+      "patched_sha256": "e45ebddd16e71f3633ad30cdd3a20f4501b3ebe3690ac703d0b6448811486906"
     }
   }
 }

@@ -39,3 +39,8 @@ target_include_directories(dcpu16-bytewise-memory SYSTEM PRIVATE ${LLVM_INCLUDE_
 target_compile_options(dcpu16-bytewise-memory PRIVATE ${LLVM_DEFINITIONS_LIST} -fno-rtti)
 target_link_libraries(dcpu16-bytewise-memory PRIVATE LLVMInstCombine LLVMScalarOpts LLVMAsmParser LLVMAnalysis LLVMCore)
 add_test(NAME dcpu16-bytewise-memory COMMAND dcpu16-bytewise-memory)
+add_executable(dcpu16-dse-units dse-units.cpp)
+target_include_directories(dcpu16-dse-units SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+target_compile_options(dcpu16-dse-units PRIVATE ${LLVM_DEFINITIONS_LIST} -fno-rtti)
+target_link_libraries(dcpu16-dse-units PRIVATE LLVMScalarOpts LLVMAsmParser LLVMAnalysis LLVMCore)
+add_test(NAME dcpu16-dse-units COMMAND dcpu16-dse-units)
