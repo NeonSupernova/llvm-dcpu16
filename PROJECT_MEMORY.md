@@ -492,3 +492,11 @@ Do not claim a full local bootstrap rerun; remote clean bootstrap is pending.
 Next: loop-idiom recognition and remaining optimizer conversions, then the
 EVT/LLT/MMO/SelectionDAG/frame/emitter/object/runtime work in WORD16.md.
 Native --byte-size=16 remains deliberately disabled. Nyet is untouched.
+
+DSE implementation committed/pushed as f311d03199d910b1e49d928371c82a6d7dcf268f.
+Clean eight-patch Ubuntu core bootstrap is running:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42700053035
+Ordinary backend workflow is also running:
+https://github.com/NeonSupernova/llvm-dcpu16/actions/runs/42700052749
+These are pending verification, not claimed successful. Check them before the
+next continuation; local all-group CTest and no-PCH checks already pass.
